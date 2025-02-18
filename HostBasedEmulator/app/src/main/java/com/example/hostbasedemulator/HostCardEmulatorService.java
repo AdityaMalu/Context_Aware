@@ -1,9 +1,15 @@
 package com.example.hostbasedemulator;
 
+import static com.example.hostbasedemulator.Utils.getIssuerPublicKey;
+import static com.example.hostbasedemulator.Utils.toHex;
+
 import android.nfc.cardemulation.HostApduService;
 import android.os.Bundle;
 import android.util.Log;
 
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.Signature;
 import java.util.Arrays;
 
 public class HostCardEmulatorService extends HostApduService {
@@ -20,6 +26,8 @@ public class HostCardEmulatorService extends HostApduService {
     private static final byte[] UNKNOWN_COMMAND_RESPONSE = {(byte) 0x6F, (byte) 0x00}; // Unknown command
     private short balance = 0;
 
+    private byte[] challenge = new byte[16];
+
     @Override
     public void onDeactivated(int reason) {
         Log.d(TAG, "Deactivated: " + reason);
@@ -30,7 +38,7 @@ public class HostCardEmulatorService extends HostApduService {
         Log.i("INFO", "Apdu received " + Arrays.toString(apdu));
         // Handle SELECT AID command
         if (isSelectAidCommand(apdu)) {
-            return SELECT_AID_RESPONSE;
+            return challenge(apdu);
         }
 
         // Parse APDU command
@@ -42,15 +50,21 @@ public class HostCardEmulatorService extends HostApduService {
         byte ins = apdu[1];
 
         if (cla == (byte) 0x80) {
-            switch (ins) {
-                case (byte) 0x50: // GET_BALANCE
-                    return getBalanceResponse();
-                case (byte) 0x30: // CREDIT
-                    return creditBalance(apdu);
-                case (byte) 0x40: // DEBIT
-                    return debitBalance(apdu);
-                default:
-                    return UNKNOWN_COMMAND_RESPONSE;
+            try {
+                switch (ins) {
+                    case (byte) 0x20:
+                        return checkSignature(apdu);
+                    case (byte) 0x50: // GET_BALANCE
+                        return getBalanceResponse();
+                    case (byte) 0x30: // CREDIT
+                        return creditBalance(apdu);
+                    case (byte) 0x40: // DEBIT
+                        return debitBalance(apdu);
+                    default:
+                        return UNKNOWN_COMMAND_RESPONSE;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
 
@@ -116,10 +130,69 @@ public class HostCardEmulatorService extends HostApduService {
 
     private boolean isSelectAidCommand(byte[] apdu) {
         // Check if the APDU is a SELECT AID command
+        Log.d("APDU", toHex(apdu));
+        return apdu.length >= 5 && apdu[1] == (byte) 0xA4;
+    }
+
+    private byte[] challenge(byte[] apdu) {
+        // Check if the APDU is a SELECT AID command
+        Log.d("APDU", toHex(apdu));
         if (apdu.length >= 5 && apdu[1] == (byte) 0xA4) {
-            return true;
+            String data = toHex(apdu);
+            String appID = data.substring(24);
+            Log.d("AppID", appID);
+
+            challenge = generateChallenge();
+
+            if (challenge.length != 16) {
+                Log.e("ERROR", "Challenge size is not 16 bytes!");
+                return new byte[]{(byte) 0x6A, (byte) 0x80};
+            }
+
+            byte[] response = new byte[5 + 16 + 2];
+
+            response[0] = (byte) 0x90;
+            response[1] = (byte) 0x10;
+            response[2] = (byte) 0x00;
+            response[3] = (byte) 0x00;
+            response[4] = (byte) 0x18;
+
+            System.arraycopy(challenge, 0, response, 5, 16);
+
+            response[21] = (byte) 0x90;
+            response[22] = (byte) 0x00;
+
+            return response;
         }
-        return false;
+        return new byte[]{(byte) 0x6A, (byte) 0x82};
+    }
+
+    public byte[] generateChallenge(){
+        byte[] challenge = new byte[16];
+        new SecureRandom().nextBytes(challenge);
+        return challenge;
+    }
+
+    public byte[] checkSignature(byte[] apdu) throws Exception {
+        byte[] signedData = new byte[256];
+        System.arraycopy(apdu, 5, signedData, 0, 256);
+        PublicKey publicKey = getIssuerPublicKey();
+        if (verifySignature(signedData, publicKey)) {
+            Log.d("SUCCESS", "9000");
+            return new byte[] {
+                    (byte) 0x80, (byte) 0x20, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x90, (byte) 0x00
+            };
+        }
+        return new byte[] {
+                (byte) 0x80, (byte) 0x20, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x6F, (byte) 0x00
+        };
+    }
+
+    public boolean verifySignature(byte[] signedData, PublicKey publicKey) throws Exception {
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initVerify(publicKey);
+        signature.update(challenge);
+        return signature.verify(signedData);
     }
 
     // Helper method to handle extended length APDUs
