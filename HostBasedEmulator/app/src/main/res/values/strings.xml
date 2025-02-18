@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ExHostBasedEmulator</string>
+    <string name="servicedesc">Service Not Available</string>
+    <string name="aiddescription">AIDis></string>
+</resources>
