@@ -1,5 +1,8 @@
 package com.example.reader;
 
+import static com.example.reader.Utils.concatenateArrays;
+import static com.example.reader.Utils.getIssuerPrivateKey;
+import static com.example.reader.Utils.hexStringToByteArray;
 import static com.example.reader.Utils.toHex;
 
 import android.app.PendingIntent;
@@ -16,9 +19,17 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import java.io.IOException;
+import java.security.PrivateKey;
+import java.security.Signature;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Objects;
+
 import com.example.reader.Utils;
 
 public class MainActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback {
@@ -26,6 +37,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     private TextView statusTextView;
     private EditText amountEditText;
     private IsoDep isoDep;
+    private Fragment activeFragment;
+    private HashMap<Fragment, String> fragmentMap = new HashMap<>(); // Map to store fragments and their names
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,16 +47,45 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         setContentView(R.layout.activity_main);
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
-        statusTextView = findViewById(R.id.tv_status);
-        amountEditText = findViewById(R.id.et_amount);
 
-        Button btnCredit = findViewById(R.id.btn_credit);
-        Button btnDebit = findViewById(R.id.btn_debit);
-        Button btnGetBalance = findViewById(R.id.btn_get_balance);
+        Button btnId = findViewById(R.id.btn_id);
+        Button btnTicket = findViewById(R.id.btn_ticket);
+        Button btnHealthcare = findViewById(R.id.btn_healthcare);
 
-        btnCredit.setOnClickListener(v -> sendApduCommand((byte) 0x30)); // Credit
-        btnDebit.setOnClickListener(v -> sendApduCommand((byte) 0x40)); // Debit
-        btnGetBalance.setOnClickListener(v -> sendApduCommand((byte) 0x50)); // Get Balance
+        IDFragment idFragment = new IDFragment();
+        TicketFragment ticketFragment = new TicketFragment();
+        HealthCareFragment healthCareFragment = new HealthCareFragment();
+
+        fragmentMap.put(idFragment, "482730");
+        fragmentMap.put(ticketFragment, "307210");
+        fragmentMap.put(healthCareFragment, "915460");
+
+        activeFragment = idFragment;
+        loadFragment(activeFragment);
+
+        btnId.setOnClickListener(v -> switchFragment(idFragment));
+        btnTicket.setOnClickListener(v -> switchFragment(ticketFragment));
+        btnHealthcare.setOnClickListener(v -> switchFragment(healthCareFragment));
+    }
+
+    private void switchFragment(Fragment fragment) {
+        if (activeFragment != fragment) {
+            activeFragment = fragment;
+            loadFragment(fragment);
+        }
+    }
+
+    private void loadFragment(Fragment fragment) {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+        fragmentTransaction.replace(R.id.container, fragment);
+        fragmentTransaction.commit();
+
+        // Log or use the fragment name
+        String fragmentName = fragmentMap.get(fragment);
+        if (fragmentName != null) {
+            System.out.println("Active Fragment: " + fragmentName);
+        }
     }
 
     @Override
@@ -62,28 +105,10 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
-    private void sendApduCommand(byte instruction) {
+    private void sendApduCommand(byte[] command) {
         if (isoDep == null || !isoDep.isConnected()) {
             statusTextView.setText("No NFC Tag connected");
             return;
-        }
-
-        byte[] command;
-        if (instruction == (byte) 0x50) { // GET_BALANCE
-            Log.i("INFO", "Get Balance command");
-            command = new byte[]{(byte) 0x80, instruction, 0x00, 0x00, 0x00};
-            Log.i("INFO", "Processed command" + Arrays.toString(new String[]{toHex(command)}));
-        } else {
-            String amountStr = amountEditText.getText().toString();
-            if (amountStr.isEmpty()) {
-                statusTextView.setText("Enter a valid amount");
-                return;
-            }
-
-            byte amount = (byte) Integer.parseInt(amountStr);
-            Log.i("INFO", "Amount " + amount);
-            command = new byte[]{(byte) 0x80, instruction, 0x00, 0x00, 0x01, amount};
-            Log.i("INFO", "Processed command" + Arrays.toString(new String[]{toHex(command)}));
         }
 
         try {
@@ -93,10 +118,19 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             handleResponse(response);
         } catch (IOException e) {
             statusTextView.setText("APDU Command failed");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
-    private void handleResponse(byte[] response) {
+    public byte[] signChallenge(byte[] challenge, PrivateKey privateKey) throws Exception {
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initSign(privateKey);
+        signature.update(challenge);
+        return signature.sign();
+    }
+
+    private void handleResponse(byte[] response) throws Exception {
         if (response.length < 2) {
             statusTextView.setText("Invalid response");
             return;
@@ -106,10 +140,14 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         byte sw1 = response[response.length - 2];
         byte sw2 = response[response.length - 1];
         if (sw1 == (byte) 0x90 && sw2 == (byte) 0x00) {
-            if (response.length > 2) {
+            if (response[1] == (byte) 0x10) {
                 // Extract the balance from response for GET_BALANCE
-                short balance = (short) ((response[0] << 8) | (response[1] & 0xFF));
-                statusTextView.setText("Balance: " + balance);
+                byte[] challenge = new byte[16];
+                System.arraycopy(response,5,challenge,0,16);
+                byte[] signedChallenge = signChallenge(challenge,getIssuerPrivateKey());
+                byte[] command = new byte[]{(byte) 0x80 , 0x20 , 0x00, 0x00, 0x00};
+                command = concatenateArrays(command,signedChallenge);
+                sendApduCommand(command);
             } else {
                 statusTextView.setText("Command executed successfully");
             }
@@ -124,13 +162,18 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         if (isoDep != null) {
             try {
                 isoDep.connect();
-                runOnUiThread(() -> statusTextView.setText("HCE Device Connected"));
-                byte[] response = isoDep.transceive(Utils.hexStringToByteArray(
+//                runOnUiThread(() -> statusTextView.setText("HCE Device Connected"));
+                byte[] data = (Utils.hexStringToByteArray(
                         "00A4040007A0000002471001"));
-                Log.i("INFO", "Response " + Arrays.toString(new String[]{toHex(response)}));
+                byte[] appID = hexStringToByteArray(Objects.requireNonNull(fragmentMap.get(activeFragment)));
+                Log.d("Acitve Fragment", Arrays.toString(appID));
+                byte[] command = concatenateArrays(data,appID);
+                Log.d("Auth" , toHex(command));
+                Log.i("INFO", "Response " + Arrays.toString(new String[]{toHex(command)}));
+                byte[] response = isoDep.transceive(command);
                 handleResponse(response);
-            } catch (IOException e) {
-                runOnUiThread(() -> statusTextView.setText("Failed to connect to HCE Device"));
+            } catch (Exception e) {
+//                runOnUiThread(() -> statusTextView.setText("Failed to connect to HCE Device"));
             }
         }
     }

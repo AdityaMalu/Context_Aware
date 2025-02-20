@@ -1,8 +1,40 @@
 package com.example.reader;
 
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
+
 public class Utils {
     private static final String HEX_CHARS = "0123456789ABCDEF";
     private static final char[] HEX_CHARS_ARRAY = "0123456789ABCDEF".toCharArray();
+
+    public static String ISSUER_PRIVATE_KEY = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCXdllUtpHZWS0x" +
+            "74KMXJXoF2bZGYFdYiBlrz1wZhRQPXyYcbFCekJsd3kO6akDAOtJdKmxG9qky1Nu" +
+            "DCDWnOYodloSoDO+ccPfcaTvMlWIDfVtyAlxtsSBD7EiOLwcKJ6oKdeDeV0jo6r/" +
+            "cpVgVZlx+v/h5QA2VFa9yV28iIwLZu5GRvqB2K6L4YyxPOrjat/7KE2Eh0wYUivv" +
+            "7QTv2LlzxfR4XbCfjOwoWdbJSJTLIfDJhpPRT02Xwx8FxEdMJq9ip0uNjOC87auh" +
+            "WVBH2IjTBeI/EV5FCpRSNbgdyXOnOMsedt6xPvR4FDC+kjvv24dmUuflcdELL4Ys" +
+            "Jw87TUirAgMBAAECggEBAIGnCWj+r3LCZ3GreLD2QExgW+XTc22gpeLlU05300Os" +
+            "no9QI1Con1uCGdquIcM0cjR67RdypIMUmeJF94Y+4LYaOZhgEmsfr3ACNBGdoKHK" +
+            "cSD8bzksHqHr8NE+h6gDDW0eBCHDLftoCuSIDV5dZ/Ctz4RrJvda0rW7PcY5jMfk" +
+            "juTeNT5aUEECgKrgCkR/wgQ63QMxRHetDxvqJNZEQaGPDOkJQWkPfL1HbzE+Fcm4" +
+            "BanXYo16VAEA52ZmTQ6kOaZd3NA/z2ZnwM2YudSX27Fnvs7JezSRSMIiT2hia4nW" +
+            "xvwKjES8JCJbl3+Gj856n7+oEj6W3dGYL+sUEwZ8AqECgYEAzsmTwKXX1FqoEsyg" +
+            "dTXtkBZbnf0CN0gipXexqjAPLzjyPwIbEDE8puGIjeWpfAEZZVFKXijv5es1I2u3" +
+            "ZPRwAc4pkhgiARb5+n8JQ6dXRqkr9Ol6vA7KUlIpQoF8We1aLAbcQ6j4kMRj+Tli" +
+            "YHl1DzIyf9SXAF4Yv24QHGFqgAcCgYEAu4IdwoSXVl8QU3IWfqyMohsZO8uTSKXU" +
+            "2Wz2xiq6MIaTBtoq/vi0YXllaBlQ+lgIzZxHwxQ1RR+6SAMy475rBH1Ugzy9GwP6" +
+            "REQqTfLo+KuwMxFkuHP/w3Q3PNlsKutX34f2kDrQ4+HVXyuJVk0ebrzz6jwlZUEh" +
+            "gJS1uRF9QT0CgYBaX5qlXVWgRyahYLDXyQPULxFHUOYBBxOtQUxyVqKsPrUQeHkf" +
+            "cIVTYcnuSeryeQCCWS6pTDbcQxlsK41xH6s7/sAIS2fBFiuWIKMJ4D6ycQj29ntf" +
+            "aQ9fPu0tVa3lF2iLSUxGfbh0fIA80al/BFX2mDedymlcDcO/FfkQjjqfTQKBgHt6" +
+            "CsjucY5SGbkptwCB9jZF7A8BVyMO+SSY6cTDnEqaRDXN82RmOLq7q3iquzWwRVPI" +
+            "50TiiNXVN+F2IcvxuB2DvuSRWeJxcxwDW2xrWtlujiCDArWoxbNbU4jBkMaOphYw" +
+            "PcDqymZWcCE01UK8lB7OVT1ZkDKmej5nL2gIyVftAoGAO1A3vYzDB6dD34pTm09e" +
+            "c4lyc7h1sH32rj4L9TWG/Vvqs7WaKBUFwTK970hLDJv6vZv0cDac+lFgwMji8N15" +
+            "PsGrGZXsBQzzE6dbiEcOO38TNQ8WzRskMS8fygj4ftQx5Sk8PiI5Yw5Yd/eYvqIr" +
+            "enPjgPIqseUXkPhngW3SU4c=";
 
     public static byte[] hexStringToByteArray(String data) {
         byte[] result = new byte[data.length() / 2];
@@ -16,6 +48,20 @@ public class Utils {
         }
 
         return result;
+    }
+
+//    public static PublicKey getIssuerPublicKey() throws Exception{
+//        byte[] issuerPublicKeyBytes = Base64.getDecoder().decode(ISSUER_PUBLIC_KEY);
+//        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+//        X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(issuerPublicKeyBytes);
+//        return keyFactory.generatePublic(publicKeySpec);
+//    }
+
+    public static PrivateKey getIssuerPrivateKey() throws Exception{
+        byte[] issuerPrivateKeyBytes = Base64.getDecoder().decode(ISSUER_PRIVATE_KEY);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(issuerPrivateKeyBytes);
+        return keyFactory.generatePrivate(privateKeySpec);
     }
 
     public static String toHex(byte[] byteArray) {
@@ -38,5 +84,12 @@ public class Utils {
             unsignedArray[i] = byteArray[i] & 0xFF; // Convert to unsigned
         }
         return unsignedArray;
+    }
+
+    public static byte[] concatenateArrays(byte[] array1, byte[] array2) {
+        byte[] result = new byte[array1.length + array2.length];
+        System.arraycopy(array1, 0, result, 0, array1.length);
+        System.arraycopy(array2, 0, result, array1.length, array2.length);
+        return result;
     }
 }
