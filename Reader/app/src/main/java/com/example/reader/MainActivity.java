@@ -75,6 +75,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
+
+
     private void loadFragment(Fragment fragment) {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
