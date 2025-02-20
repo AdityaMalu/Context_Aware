@@ -1,13 +1,39 @@
 package com.example.reader;
 
+import androidx.fragment.app.Fragment;
+
+import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import java.math.BigInteger;
+import java.security.*;
+import java.security.spec.ECGenParameterSpec;
+import java.util.HashMap;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyAgreement;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public class Utils {
     private static final String HEX_CHARS = "0123456789ABCDEF";
     private static final char[] HEX_CHARS_ARRAY = "0123456789ABCDEF".toCharArray();
+
+    private static HashMap<Fragment, String> fragmentMap = new HashMap<>();
+
+    public static void put(Fragment fragment, String value){
+        fragmentMap.put(fragment,value);
+    }
+
+    public static String get(Fragment fragment){
+        return fragmentMap.get(fragment);
+    }
 
     public static String ISSUER_PRIVATE_KEY = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCXdllUtpHZWS0x" +
             "74KMXJXoF2bZGYFdYiBlrz1wZhRQPXyYcbFCekJsd3kO6akDAOtJdKmxG9qky1Nu" +
@@ -36,6 +62,60 @@ public class Utils {
             "PsGrGZXsBQzzE6dbiEcOO38TNQ8WzRskMS8fygj4ftQx5Sk8PiI5Yw5Yd/eYvqIr" +
             "enPjgPIqseUXkPhngW3SU4c=";
 
+    static {
+        if (Security.getProvider("BC") == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+    }
+
+    public static KeyPair generateKeyPairFromSeed(byte[] seed) throws Exception {
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC");
+
+        ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256r1");
+
+        SecureRandom secureRandom = SecureRandom.getInstance("SHA1PRNG");
+        secureRandom.setSeed(seed);
+
+        keyPairGenerator.initialize(ecSpec, secureRandom);
+        return keyPairGenerator.generateKeyPair();
+    }
+
+    public static SecretKey deriveAESKey(PrivateKey privateKey, PublicKey publicKey) throws Exception {
+        KeyAgreement keyAgreement = KeyAgreement.getInstance("ECDH");
+
+        keyAgreement.init(privateKey);
+        keyAgreement.doPhase(publicKey, true);
+
+        byte[] sharedSecret = keyAgreement.generateSecret();
+        byte[] aesKeyBytes = MessageDigest.getInstance("SHA-256").digest(sharedSecret);  // Hashing for AES key
+        return new SecretKeySpec(aesKeyBytes, 0, 16, "AES"); // AES-128
+    }
+
+    public static String encryptAES(String plaintext, SecretKey aesKey) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+
+        byte[] iv = new byte[16];  // Zero IV (for simplicity)
+        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+
+        cipher.init(Cipher.ENCRYPT_MODE, aesKey, ivSpec);
+        byte[] encryptedBytes = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+
+        return Base64.getEncoder().encodeToString(encryptedBytes);
+    }
+
+    public static String decryptAES(String encryptedText, SecretKey aesKey) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+
+        byte[] iv = new byte[16];  // Zero IV (same as encryption)
+        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+
+        cipher.init(Cipher.DECRYPT_MODE, aesKey, ivSpec);
+        byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
+
+        return new String(decryptedBytes, StandardCharsets.UTF_8);
+    }
+
+
     public static byte[] hexStringToByteArray(String data) {
         byte[] result = new byte[data.length() / 2];
 
@@ -62,6 +142,13 @@ public class Utils {
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
         PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(issuerPrivateKeyBytes);
         return keyFactory.generatePrivate(privateKeySpec);
+    }
+
+    public static String createIndex(){
+        byte[] index = new byte[16]; // 16-byte (128-bit) index
+        new SecureRandom().nextBytes(index); // Generate random bytes
+        return toHex(index); // Convert to HexString
+
     }
 
     public static String toHex(byte[] byteArray) {

@@ -32,13 +32,15 @@ import java.util.Objects;
 
 import com.example.reader.Utils;
 
-public class MainActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback {
+public class MainActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback, APDUCommandListner{
     private NfcAdapter nfcAdapter;
     private TextView statusTextView;
     private EditText amountEditText;
     private IsoDep isoDep;
-    private Fragment activeFragment;
-    private HashMap<Fragment, String> fragmentMap = new HashMap<>(); // Map to store fragments and their names
+    public static Fragment activeFragment;
+
+    public static boolean isHCEConnected = false;
+     // Map to store fragments and their names
 
 
     @Override
@@ -52,13 +54,13 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         Button btnTicket = findViewById(R.id.btn_ticket);
         Button btnHealthcare = findViewById(R.id.btn_healthcare);
 
-        IDFragment idFragment = new IDFragment();
+        IDFragment idFragment = new IDFragment(this::sendApduCommand);
         TicketFragment ticketFragment = new TicketFragment();
         HealthCareFragment healthCareFragment = new HealthCareFragment();
 
-        fragmentMap.put(idFragment, "482730");
-        fragmentMap.put(ticketFragment, "307210");
-        fragmentMap.put(healthCareFragment, "915460");
+        Utils.put(idFragment, "482730");
+        Utils.put(ticketFragment, "307210");
+        Utils.put(healthCareFragment, "915460");
 
         activeFragment = idFragment;
         loadFragment(activeFragment);
@@ -84,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         fragmentTransaction.commit();
 
         // Log or use the fragment name
-        String fragmentName = fragmentMap.get(fragment);
+        String fragmentName = Utils.get(fragment);
         if (fragmentName != null) {
             System.out.println("Active Fragment: " + fragmentName);
         }
@@ -107,7 +109,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
-    private void sendApduCommand(byte[] command) {
+    public void sendApduCommand(byte[] command) {
         if (isoDep == null || !isoDep.isConnected()) {
             statusTextView.setText("No NFC Tag connected");
             return;
@@ -138,6 +140,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             return;
         }
         Log.i("INFO", "Response received" + Arrays.toString(new String[]{toHex(response)}));
+        isHCEConnected = true;
+
 
         byte sw1 = response[response.length - 2];
         byte sw2 = response[response.length - 1];
@@ -150,7 +154,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 byte[] command = new byte[]{(byte) 0x80 , 0x20 , 0x00, 0x00, 0x00};
                 command = concatenateArrays(command,signedChallenge);
                 sendApduCommand(command);
-            } else {
+            }
+            else if(response[1] == (byte) 0x30){
+                Log.d("Index Saved" , toHex(response));
+            }
+            else {
                 statusTextView.setText("Command executed successfully");
             }
         } else {
@@ -167,14 +175,16 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 //                runOnUiThread(() -> statusTextView.setText("HCE Device Connected"));
                 byte[] data = (Utils.hexStringToByteArray(
                         "00A4040007A0000002471001"));
-                byte[] appID = hexStringToByteArray(Objects.requireNonNull(fragmentMap.get(activeFragment)));
+                byte[] appID = hexStringToByteArray(Objects.requireNonNull(Utils.get(activeFragment)));
                 Log.d("Acitve Fragment", Arrays.toString(appID));
                 byte[] command = concatenateArrays(data,appID);
                 Log.d("Auth" , toHex(command));
                 Log.i("INFO", "Response " + Arrays.toString(new String[]{toHex(command)}));
                 byte[] response = isoDep.transceive(command);
+
                 handleResponse(response);
             } catch (Exception e) {
+                    isHCEConnected = false;
 //                runOnUiThread(() -> statusTextView.setText("Failed to connect to HCE Device"));
             }
         }
