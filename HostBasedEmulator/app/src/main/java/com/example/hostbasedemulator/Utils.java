@@ -15,6 +15,8 @@ public class Utils {
 
     public static String TICKETING_APP_ID="30721";
 
+    public static final String PREF_NAME = "MyAppPrefs";
+
     public static String ISSUER_PUBLIC_KEY =  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl3ZZVLaR2VktMe+CjFyV6Bdm2RmBXWIgZa89cGYUUD18mHGxQnpCbHd5DumpAwDrSXSpsRvapMtTbgwg1pzmKHZaEqAzvnHD33Gk7zJViA31bcgJcbbEgQ+xIji8HCieqCnXg3ldI6Oq/3KVYFWZcfr/4eUANlRWvcldvIiMC2buRkb6gdiui+GMsTzq42rf+yhNhIdMGFIr7+0E79i5c8X0eF2wn4zsKFnWyUiUyyHwyYaT0U9Nl8MfBcRHTCavYqdLjYzgvO2roVlQR9iI0wXiPxFeRQqUUjW4HclzpzjLHnbesT70eBQwvpI779uHZlLn5XHRCy+GLCcPO01IqwIDAQAB";
 
 

@@ -1,8 +1,10 @@
 package com.example.hostbasedemulator;
 
+import static com.example.hostbasedemulator.Utils.PREF_NAME;
 import static com.example.hostbasedemulator.Utils.getIssuerPublicKey;
 import static com.example.hostbasedemulator.Utils.toHex;
 
+import android.content.SharedPreferences;
 import android.nfc.cardemulation.HostApduService;
 import android.os.Bundle;
 import android.util.Log;
@@ -10,6 +12,7 @@ import android.util.Log;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
+import java.time.LocalDate;
 import java.util.Arrays;
 
 public class HostCardEmulatorService extends HostApduService {
@@ -54,10 +57,8 @@ public class HostCardEmulatorService extends HostApduService {
                 switch (ins) {
                     case (byte) 0x20:
                         return checkSignature(apdu);
-                    case (byte) 0x50: // GET_BALANCE
-                        return getBalanceResponse();
                     case (byte) 0x30: // CREDIT
-                        return creditBalance(apdu);
+                        return createRecord(apdu);
                     case (byte) 0x40: // DEBIT
                         return debitBalance(apdu);
                     default:
@@ -71,11 +72,23 @@ public class HostCardEmulatorService extends HostApduService {
         return UNKNOWN_COMMAND_RESPONSE;
     }
 
-    private byte[] getBalanceResponse() {
-        return new byte[]{
-                (byte) (balance >> 8), // High byte of balance
-                (byte) (balance & 0xFF), // Low byte of balance
-                (byte) 0x90, (byte) 0x00 // Success status word
+    private byte[] createRecord(byte[] apdu) {
+        byte[] appIdBytes = new byte[3];
+        System.arraycopy(apdu, 5, appIdBytes, 0, 3);
+        String appId = toHex(appIdBytes);
+
+        byte[] indexBytes = new byte[16];
+        System.arraycopy(apdu, 8, indexBytes, 0, 16);
+        String index = toHex(indexBytes);
+        Log.d("PREF", appId + " - " + index);
+
+        SharedPreferences sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(appId, index); // Storing the value
+        editor.apply();
+
+        return new byte[] {
+                (byte) 0x90, (byte) 0x30, (byte) 0x00, (byte) 0x00, (byte) 0x02, (byte) 0x90, (byte) 0x00
         };
     }
 
