@@ -4,21 +4,23 @@ import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.HashMap;
 
 public class Utils {
     private static final String HEX_CHARS = "0123456789ABCDEF";
     private static final char[] HEX_CHARS_ARRAY = "0123456789ABCDEF".toCharArray();
-
-    public static String IDENTITY_APP_ID = "48273";
-
-    public static String HEALTHCARE_APP_ID = "91546";
-
-    public static String TICKETING_APP_ID="30721";
-
+    public static String IDENTITY_APP_ID = "482730";
+    public static String HEALTHCARE_APP_ID = "915460";
+    public static String TICKETING_APP_ID="307210";
+    public static final HashMap<String, String> aesKeys;
+    static {
+        aesKeys = new HashMap<>();
+        aesKeys.put(IDENTITY_APP_ID, "QXNNSmdEY0duRGFMZ05SbFFHc0oxRmdqS3MyVnF1TXc=");
+        aesKeys.put(HEALTHCARE_APP_ID, "anp0bmNXbW92UVZnTDRwREdpTFA0ZDBnR214cmppZ0I=");
+        aesKeys.put(TICKETING_APP_ID, "bWJNM1hmeXZkZTlhMVVDNGRuZTRLTDBRYlFpRWhFZ3U=");
+    }
     public static final String PREF_NAME = "MyAppPrefs";
-
     public static String ISSUER_PUBLIC_KEY =  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl3ZZVLaR2VktMe+CjFyV6Bdm2RmBXWIgZa89cGYUUD18mHGxQnpCbHd5DumpAwDrSXSpsRvapMtTbgwg1pzmKHZaEqAzvnHD33Gk7zJViA31bcgJcbbEgQ+xIji8HCieqCnXg3ldI6Oq/3KVYFWZcfr/4eUANlRWvcldvIiMC2buRkb6gdiui+GMsTzq42rf+yhNhIdMGFIr7+0E79i5c8X0eF2wn4zsKFnWyUiUyyHwyYaT0U9Nl8MfBcRHTCavYqdLjYzgvO2roVlQR9iI0wXiPxFeRQqUUjW4HclzpzjLHnbesT70eBQwvpI779uHZlLn5XHRCy+GLCcPO01IqwIDAQAB";
-
 
     public static byte[] hexStringToByteArray(String data) {
         byte[] result = new byte[data.length() / 2];

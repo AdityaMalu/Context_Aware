@@ -1,6 +1,7 @@
 package com.example.hostbasedemulator;
 
 import static com.example.hostbasedemulator.Utils.PREF_NAME;
+import static com.example.hostbasedemulator.Utils.aesKeys;
 import static com.example.hostbasedemulator.Utils.getIssuerPublicKey;
 import static com.example.hostbasedemulator.Utils.toHex;
 
@@ -9,11 +10,17 @@ import android.nfc.cardemulation.HostApduService;
 import android.os.Bundle;
 import android.util.Log;
 
-import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.Signature;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.*;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.Base64;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 public class HostCardEmulatorService extends HostApduService {
     public static final String TAG = "HostCardEmulator";
@@ -28,6 +35,7 @@ public class HostCardEmulatorService extends HostApduService {
     private static final byte[] SELECT_AID_RESPONSE = {(byte) 0x90, (byte) 0x00}; // Success status word
     private static final byte[] UNKNOWN_COMMAND_RESPONSE = {(byte) 0x6F, (byte) 0x00}; // Unknown command
     private short balance = 0;
+    private String appID;
 
     private byte[] challenge = new byte[16];
 
@@ -59,8 +67,6 @@ public class HostCardEmulatorService extends HostApduService {
                         return checkSignature(apdu);
                     case (byte) 0x30: // CREDIT
                         return createRecord(apdu);
-                    case (byte) 0x40: // DEBIT
-                        return debitBalance(apdu);
                     default:
                         return UNKNOWN_COMMAND_RESPONSE;
                 }
@@ -92,55 +98,6 @@ public class HostCardEmulatorService extends HostApduService {
         };
     }
 
-    private byte[] creditBalance(byte[] apdu) {
-        // Ensure the APDU has enough data for the extended length amount (2 bytes)
-        if (apdu.length < 7) { // CLA (1) + INS (1) + P1 (1) + P2 (1) + LC (1) + Amount (2)
-            return UNKNOWN_COMMAND_RESPONSE;
-        }
-
-        // Read the 2-byte amount from the APDU
-        short creditAmount = (short) (((apdu[5] & 0xFF) << 8) | (apdu[6] & 0xFF));
-
-        // Validate the amount (e.g., ensure it's positive and within a reasonable range)
-        if (creditAmount < 0 || creditAmount > 32767) { // Max positive value for a signed short
-            return new byte[]{(byte) 0x6A, (byte) 0x83}; // Invalid transaction amount
-        }
-
-        // Update the balance
-        int newBalance = balance + creditAmount;
-        if (newBalance > 0x7FFF) { // Check for overflow (max positive value for a signed short)
-            return new byte[]{(byte) 0x6A, (byte) 0x84}; // Exceed maximum balance
-        }
-
-        balance = (short) newBalance;
-        return new byte[]{(byte) 0x90, (byte) 0x00}; // Success
-    }
-
-
-    private byte[] debitBalance(byte[] apdu) {
-        // Ensure the APDU has enough data for the extended length amount (2 bytes)
-        if (apdu.length < 7) { // CLA (1) + INS (1) + P1 (1) + P2 (1) + LC (1) + Amount (2)
-            return UNKNOWN_COMMAND_RESPONSE;
-        }
-
-        // Read the 2-byte amount from the APDU
-        short debitAmount = (short) (((apdu[5] & 0xFF) << 8) | (apdu[6] & 0xFF));
-
-        // Validate the amount (e.g., ensure it's positive and within a reasonable range)
-        if (debitAmount < 0 || debitAmount > 32767) { // Max positive value for a signed short
-            return new byte[]{(byte) 0x6A, (byte) 0x83}; // Invalid transaction amount
-        }
-
-        // Update the balance
-        int newBalance = balance - debitAmount;
-        if (newBalance < 0) { // Check for negative balance
-            return new byte[]{(byte) 0x6A, (byte) 0x85}; // Negative balance
-        }
-
-        balance = (short) newBalance;
-        return new byte[]{(byte) 0x90, (byte) 0x00}; // Success
-    }
-
     private boolean isSelectAidCommand(byte[] apdu) {
         // Check if the APDU is a SELECT AID command
         Log.d("APDU", toHex(apdu));
@@ -152,7 +109,7 @@ public class HostCardEmulatorService extends HostApduService {
         Log.d("APDU", toHex(apdu));
         if (apdu.length >= 5 && apdu[1] == (byte) 0xA4) {
             String data = toHex(apdu);
-            String appID = data.substring(24);
+            appID = data.substring(24);
             Log.d("AppID", appID);
 
             challenge = generateChallenge();
@@ -192,9 +149,41 @@ public class HostCardEmulatorService extends HostApduService {
         PublicKey publicKey = getIssuerPublicKey();
         if (verifySignature(signedData, publicKey)) {
             Log.d("SUCCESS", "9000");
-            return new byte[] {
-                    (byte) 0x80, (byte) 0x20, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x90, (byte) 0x00
+
+            SharedPreferences sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+//            SharedPreferences.Editor editor = sharedPreferences.edit();
+//            editor.remove(appID); // Removes only this key
+//            editor.apply();
+            if (sharedPreferences.contains(appID)) {
+                String index = sharedPreferences.getString(appID, "");
+                byte[] encryptedIndex = encryptionAES(Base64.getDecoder().decode(aesKeys.get(appID)), index);
+                Log.d("EncIndex", String.valueOf(encryptedIndex.length));
+
+                byte[] response = new byte[7 + encryptedIndex.length];
+                response[0] = (byte) 0x90;
+                response[1] = (byte) 0x20;
+                response[2] = (byte) 0x00;
+                response[3] = (byte) 0x00;
+                response[4] = (byte) (encryptedIndex.length + 2);
+
+                System.arraycopy(encryptedIndex, 0, response, 5, encryptedIndex.length);
+
+                response[response.length - 2] = (byte) 0x90;
+                response[response.length - 1] = (byte) 0x00;
+
+                Log.d("Response", Arrays.toString(response));
+
+                byte[] indexBytes = new byte[response.length - 7];
+                System.arraycopy(response, 5, indexBytes, 0, response.length - 7);
+
+
+
+                return response;
+            } else {
+                return new byte[] {
+                    (byte) 0x90, (byte) 0x20, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x90, (byte) 0x00
             };
+            }
         }
         return new byte[] {
                 (byte) 0x80, (byte) 0x20, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x6F, (byte) 0x00
@@ -208,6 +197,46 @@ public class HostCardEmulatorService extends HostApduService {
         return signature.verify(signedData);
     }
 
+    private byte[] encryptionAES(byte[] decodedKey, String plainText) throws Exception{
+        System.out.println("Plain text " + plainText);
+        SecretKey secretKey = new SecretKeySpec(decodedKey, "AES");
+        byte[] iv = new byte[16];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(iv);
+
+        IvParameterSpec ivspec = new IvParameterSpec(iv);
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivspec);
+
+        byte[] encryptedData = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
+        System.out.println("Enc text " + Arrays.toString(encryptedData));
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(iv.length + encryptedData.length);
+        byteBuffer.put(iv);
+        byteBuffer.put(encryptedData);
+        System.out.println("Byte buffer " + Arrays.toString(byteBuffer.array()) + " length " + byteBuffer.array().length);
+        return byteBuffer.array();
+    }
+
+    private String decryptionAES(byte[] decodedKey, String encryptedText)throws Exception {
+        byte[] decodedData = Base64.getDecoder().decode(encryptedText);
+        System.out.println("Decoded data " + Arrays.toString(decodedData));
+        SecretKey secretKey = new SecretKeySpec(decodedKey, "AES");
+        ByteBuffer byteBuffer = ByteBuffer.wrap(decodedData);
+
+        byte[] iv = new byte[16];
+        byteBuffer.get(iv);  // Extract IV
+        byte[] encryptedData = new byte[byteBuffer.remaining()];
+        byteBuffer.get(encryptedData);
+
+        IvParameterSpec ivspec = new IvParameterSpec(iv);
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, ivspec);
+
+        byte[] decryptedData = cipher.doFinal(encryptedData);
+        System.out.println("Dec data " + Arrays.toString(decryptedData));
+        return new String(decryptedData, StandardCharsets.UTF_8);
+    }
     // Helper method to handle extended length APDUs
     private int getExtendedLength(byte[] apdu, int offset) {
         if (apdu.length < offset + 2) {
