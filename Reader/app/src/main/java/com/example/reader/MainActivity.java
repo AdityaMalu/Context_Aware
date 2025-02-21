@@ -1,8 +1,17 @@
 package com.example.reader;
 
+import static com.example.reader.Utils.HEALTHCARE_APP_ID;
+import static com.example.reader.Utils.IDENTITY_APP_ID;
+import static com.example.reader.Utils.TICKETING_APP_ID;
+import static com.example.reader.Utils.aesKeys;
 import static com.example.reader.Utils.concatenateArrays;
+
+import static com.example.reader.Utils.decrypt;
+import static com.example.reader.Utils.generateKey;
+import static com.example.reader.Utils.get;
 import static com.example.reader.Utils.getIssuerPrivateKey;
 import static com.example.reader.Utils.hexStringToByteArray;
+
 import static com.example.reader.Utils.toHex;
 
 import android.app.PendingIntent;
@@ -24,22 +33,41 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.Signature;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Objects;
 
 import com.example.reader.Utils;
 
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 public class MainActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback, APDUCommandListner{
     private NfcAdapter nfcAdapter;
     private TextView statusTextView;
     private EditText amountEditText;
-    private IsoDep isoDep;
+    private static IsoDep isoDep;
     public static Fragment activeFragment;
 
-    public static boolean isHCEConnected = false;
+    private String decryptedIndex;
+
+    ApiService apiService = RetrofitClient.getApiService();
+
      // Map to store fragments and their names
 
 
@@ -58,9 +86,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         TicketFragment ticketFragment = new TicketFragment();
         HealthCareFragment healthCareFragment = new HealthCareFragment();
 
-        Utils.put(idFragment, "482730");
-        Utils.put(ticketFragment, "307210");
-        Utils.put(healthCareFragment, "915460");
+        Utils.put(idFragment, IDENTITY_APP_ID);
+        Utils.put(ticketFragment, TICKETING_APP_ID);
+        Utils.put(healthCareFragment, HEALTHCARE_APP_ID);
 
         activeFragment = idFragment;
         loadFragment(activeFragment);
@@ -109,6 +137,16 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         }
     }
 
+    public static boolean checkTag(){
+        try{
+            return isoDep.isConnected();
+        }
+        catch (Exception e){
+            Log.d("Security Exception" , "The Card has lost the connection");
+        }
+        return false;
+    }
+
     public void sendApduCommand(byte[] command) {
         if (isoDep == null || !isoDep.isConnected()) {
             statusTextView.setText("No NFC Tag connected");
@@ -134,13 +172,74 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         return signature.sign();
     }
 
+    private String decrpytIndex(byte[] encrpytedIndex) throws Exception{
+        byte[] decodedKey = Base64.getDecoder().decode(aesKeys.get(get(activeFragment)));
+        System.out.println("Decoded data " + (Arrays.toString(encrpytedIndex)));
+        SecretKey secretKey = new SecretKeySpec(decodedKey, "AES");
+        ByteBuffer byteBuffer = ByteBuffer.wrap(encrpytedIndex);
+
+        byte[] iv = new byte[16];
+        byteBuffer.get(iv);  // Extract IV
+        byte[] encryptedData = new byte[byteBuffer.remaining()];
+        byteBuffer.get(encryptedData);
+
+        IvParameterSpec ivspec = new IvParameterSpec(iv);
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, ivspec);
+
+        byte[] decryptedData = cipher.doFinal(encryptedData);
+        System.out.println("Dec data " + Arrays.toString(decryptedData));
+        return new String(decryptedData, StandardCharsets.UTF_8);
+
+    }
+
+    private void sendIndextoServer(String decryptedIndex){
+        DisplayRequest request = new DisplayRequest(decryptedIndex,get(activeFragment));
+        Call<DisplayResponse> call = apiService.displayDetails(request);
+
+        call.enqueue(new Callback<DisplayResponse>() {
+            @Override
+            public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
+                if(response.isSuccessful()){
+                    DisplayResponse body = response.body();
+                    String encryptedData = body.getMessage();
+                    Log.d("server response" , encryptedData);
+                    String fragmentValue = Utils.get(MainActivity.activeFragment);
+                    String seed = fragmentValue + decryptedIndex;
+                    Log.d("Seed" , seed);
+                    byte[] seedBytes = Utils.hexStringToByteArray(seed);
+                    try {
+                        SecretKey key = generateKey(seed);
+                        String decryptedJSON = decrypt(encryptedData,key);
+                        IDData idData = IDData.fromJson(decryptedJSON);
+                        Log.d("Name : " , idData.getName());
+                        Log.d("DOB : " , idData.getDob());
+                        Log.d("ID : " , idData.getIdNumber());
+
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+
+
+                }
+                else{
+                    Log.e("Request failed", "Response code: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<DisplayResponse> call, Throwable t) {
+                Log.e("Request failed", "Response code: " + t);
+            }
+        });
+    }
+
     private void handleResponse(byte[] response) throws Exception {
         if (response.length < 2) {
             statusTextView.setText("Invalid response");
             return;
         }
         Log.i("INFO", "Response received" + Arrays.toString(new String[]{toHex(response)}));
-        isHCEConnected = true;
 
 
         byte sw1 = response[response.length - 2];
@@ -155,8 +254,19 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                 command = concatenateArrays(command,signedChallenge);
                 sendApduCommand(command);
             }
-            else if(response[1] == (byte) 0x30){
-                Log.d("Index Saved" , toHex(response));
+            else if(response[1] == (byte) 0x20){
+                if(response.length == 7){
+                    Log.d("Index Saved" , toHex(response));
+                }
+                else{
+                    byte[] indexBytes = new byte[response.length - 7];
+                    System.arraycopy(response,5,indexBytes,0, response.length-7);
+                    Log.d("Index Bytes" , Arrays.toString(indexBytes));
+                    decryptedIndex = decrpytIndex(indexBytes);
+                    Log.d("Decrtypted Index" , decryptedIndex);
+                    sendIndextoServer(decryptedIndex);
+                }
+
             }
             else {
                 statusTextView.setText("Command executed successfully");
@@ -184,7 +294,6 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
                 handleResponse(response);
             } catch (Exception e) {
-                    isHCEConnected = false;
 //                runOnUiThread(() -> statusTextView.setText("Failed to connect to HCE Device"));
             }
         }

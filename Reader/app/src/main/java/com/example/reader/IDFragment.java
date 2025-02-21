@@ -1,12 +1,15 @@
 package com.example.reader;
 
+
 import static com.example.reader.Utils.concatenateArrays;
-import static com.example.reader.Utils.deriveAESKey;
-import static com.example.reader.Utils.encryptAES;
+
+import static com.example.reader.Utils.encrypt;
+import static com.example.reader.Utils.generateKey;
 import static com.example.reader.Utils.hexStringToByteArray;
 
 import android.app.AlertDialog;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,7 +23,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 
 import javax.crypto.SecretKey;
 
@@ -31,11 +38,13 @@ import retrofit2.Response;
 public class IDFragment extends Fragment{
     String jsonString;
     String index;
-
+    Button createIdButton;
     private APDUCommandListner apduCommandListner;
+    private final Handler handler = new Handler();
 
     public IDFragment(APDUCommandListner apduCommandListner){
         this.apduCommandListner = apduCommandListner;
+
     }
 
     ApiService apiService = RetrofitClient.getApiService();
@@ -48,11 +57,45 @@ public class IDFragment extends Fragment{
         TextView textView = view.findViewById(R.id.text_fragment);
         textView.setText("ID Fragment");
 
-        Button createIdButton = view.findViewById(R.id.btn_create_id);
+        createIdButton = view.findViewById(R.id.btn_create_id);
         createIdButton.setOnClickListener(v -> showCreateIdDialog());
+
+        checkCardStatus();
 
         return view;
     }
+
+    private final Runnable checkTagRunnable = new Runnable() {
+        @Override
+        public void run() {
+            checkCardStatus();
+            handler.postDelayed(this, 2000); // Check every 2 seconds
+        }
+    };
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        handler.postDelayed(checkTagRunnable, 1000); // Start checking
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        handler.removeCallbacks(checkTagRunnable); // Stop checking when fragment is inactive
+    }
+
+    private void checkCardStatus() {
+        // Check if the NFC card is connected using MainActivity's checkTag() method
+        if (MainActivity.checkTag()) {
+            createIdButton.setEnabled(true);
+//            Log.d("IDFragment", "Card is connected. Enabling Create ID button.");
+        } else {
+            createIdButton.setEnabled(false);
+//            Log.d("IDFragment", "Card is disconnected. Disabling Create ID button.");
+        }
+    }
+
 
     private void showCreateIdDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
@@ -64,7 +107,18 @@ public class IDFragment extends Fragment{
         EditText editDob = dialogView.findViewById(R.id.edit_dob);
         EditText editIdNumber = dialogView.findViewById(R.id.edit_id_number);
 
+
+
+
+        // Check Card button action
+
+
+
         builder.setPositiveButton("Create", (dialog, which) -> {
+            if (!MainActivity.checkTag()) {
+                Toast.makeText(getActivity(), "Error: NFC Card Not Connected!", Toast.LENGTH_SHORT).show();
+                return;
+            }
             String name = editName.getText().toString().trim();
             String dob = editDob.getText().toString().trim();
             String idNumber = editIdNumber.getText().toString().trim();
@@ -85,25 +139,25 @@ public class IDFragment extends Fragment{
                         return;
                     }
                     String seed = fragmentValue + index;
+                    Log.d("Seed" , seed);
                     byte[] seedBytes = Utils.hexStringToByteArray(seed);
-                    KeyPair keyPair = Utils.generateKeyPairFromSeed(seedBytes);
-                    SecretKey aesKey = deriveAESKey(keyPair.getPrivate(), keyPair.getPublic());
-                    String encryptedJson = encryptAES(jsonString, aesKey);
+                    SecretKey key = generateKey(seed);
+                    String encryptedJson = encrypt(jsonString, key);
                     Toast.makeText(getActivity(), "Encrypted JSON: " + encryptedJson, Toast.LENGTH_LONG).show();
-                    sendIDtoServer(index, encryptedJson, Utils.get(MainActivity.activeFragment));
-                    byte[] command = new byte[]{(byte) 0x80, 0x30, 0x00, 0x00, 0x00};
-                    byte[] data = concatenateArrays(hexStringToByteArray(fragmentValue), hexStringToByteArray(index));
-                    command = concatenateArrays(command,data);
-                    apduCommandListner.sendApduCommand(command);
-                    if(MainActivity.isHCEConnected){
 
+                    Log.d("Server", "Server is avaiable");
+                    if (MainActivity.checkTag()){
+                        sendIDtoServer(index, encryptedJson, Utils.get(MainActivity.activeFragment));
+                        Log.d("HCEDevice" , "HCEDevice Connectd");
+                        byte[] command = new byte[]{(byte) 0x80, 0x30, 0x00, 0x00, 0x00};
+                        byte[] data = concatenateArrays(Utils.hexStringToByteArray(fragmentValue), Utils.hexStringToByteArray(index));
+                        command = concatenateArrays(command, data);
+                        // Send APDU command
+                        apduCommandListner.sendApduCommand(command);
                     }
                     else{
-                        Log.d("HCE Card" , "Card is Disconncted");
+                        Log.d("HCE Card", "Card is Disconnected");
                     }
-
-
-
                 }
                 catch (Exception e)
                 {
@@ -119,6 +173,9 @@ public class IDFragment extends Fragment{
         AlertDialog dialog = builder.create();
         dialog.show();
     }
+
+
+
 
     private void sendIDtoServer(String index, String encryptedData, String appID){
             CreateRequest request = new CreateRequest(index,encryptedData,appID);

@@ -1,31 +1,59 @@
 package com.example.reader;
 
+
+
 import androidx.fragment.app.Fragment;
 
-import java.nio.charset.StandardCharsets;
+
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
+
 import java.security.spec.PKCS8EncodedKeySpec;
+
 import java.util.Base64;
 
+
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import java.math.BigInteger;
+
+
 import java.security.*;
-import java.security.spec.ECGenParameterSpec;
+
 import java.util.HashMap;
 
 import javax.crypto.Cipher;
-import javax.crypto.KeyAgreement;
+
 import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.GCMParameterSpec;
+
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class Utils {
     private static final String HEX_CHARS = "0123456789ABCDEF";
     private static final char[] HEX_CHARS_ARRAY = "0123456789ABCDEF".toCharArray();
 
+
+    static String IDENTITY_APP_ID = "482730";
+    static String HEALTHCARE_APP_ID = "915460";
+     static String  TICKETING_APP_ID = "307210";
+
+    private static final String SALT = "fixed_salt"; // Should be unique per user if possible
+    private static final int KEY_SIZE = 256;
+    private static final int ITERATIONS = 10000;
+    private static final int GCM_TAG_LENGTH = 128;
+
     private static HashMap<Fragment, String> fragmentMap = new HashMap<>();
+
+    public static final HashMap<String, String> aesKeys;
+    static {
+        aesKeys = new HashMap<>();
+        aesKeys.put(IDENTITY_APP_ID, "QXNNSmdEY0duRGFMZ05SbFFHc0oxRmdqS3MyVnF1TXc=");
+        aesKeys.put(HEALTHCARE_APP_ID, "anp0bmNXbW92UVZnTDRwREdpTFA0ZDBnR214cmppZ0I=");
+        aesKeys.put(TICKETING_APP_ID, "bWJNM1hmeXZkZTlhMVVDNGRuZTRLTDBRYlFpRWhFZ3U=");
+    }
+
 
     public static void put(Fragment fragment, String value){
         fragmentMap.put(fragment,value);
@@ -34,6 +62,7 @@ public class Utils {
     public static String get(Fragment fragment){
         return fragmentMap.get(fragment);
     }
+
 
     public static String ISSUER_PRIVATE_KEY = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCXdllUtpHZWS0x" +
             "74KMXJXoF2bZGYFdYiBlrz1wZhRQPXyYcbFCekJsd3kO6akDAOtJdKmxG9qky1Nu" +
@@ -63,57 +92,48 @@ public class Utils {
             "enPjgPIqseUXkPhngW3SU4c=";
 
     static {
-        if (Security.getProvider("BC") == null) {
             Security.addProvider(new BouncyCastleProvider());
-        }
     }
 
-    public static KeyPair generateKeyPairFromSeed(byte[] seed) throws Exception {
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC");
-
-        ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256r1");
-
-        SecureRandom secureRandom = SecureRandom.getInstance("SHA1PRNG");
-        secureRandom.setSeed(seed);
-
-        keyPairGenerator.initialize(ecSpec, secureRandom);
-        return keyPairGenerator.generateKeyPair();
+    public static SecretKey generateKey(String seed) throws Exception {
+        PBEKeySpec spec = new PBEKeySpec(seed.toCharArray(), SALT.getBytes(), ITERATIONS, KEY_SIZE);
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        return new SecretKeySpec(factory.generateSecret(spec).getEncoded(),"AES");
     }
 
-    public static SecretKey deriveAESKey(PrivateKey privateKey, PublicKey publicKey) throws Exception {
-        KeyAgreement keyAgreement = KeyAgreement.getInstance("ECDH");
 
-        keyAgreement.init(privateKey);
-        keyAgreement.doPhase(publicKey, true);
+    public static String encrypt(String plaintext, SecretKey key) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        byte[] iv = new byte[12]; // GCM standard IV size
+        new SecureRandom().nextBytes(iv); // Generate a new IV
 
-        byte[] sharedSecret = keyAgreement.generateSecret();
-        byte[] aesKeyBytes = MessageDigest.getInstance("SHA-256").digest(sharedSecret);  // Hashing for AES key
-        return new SecretKeySpec(aesKeyBytes, 0, 16, "AES"); // AES-128
+        cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
+        byte[] encryptedData = cipher.doFinal(plaintext.getBytes());
+
+        // Combine IV + encrypted data and encode to Base64
+        byte[] combined = new byte[iv.length + encryptedData.length];
+        System.arraycopy(iv, 0, combined, 0, iv.length);
+        System.arraycopy(encryptedData, 0, combined, iv.length, encryptedData.length);
+
+        return Base64.getEncoder().encodeToString(combined);
     }
 
-    public static String encryptAES(String plaintext, SecretKey aesKey) throws Exception {
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+    // Decrypt data using AES-GCM
+    public static String decrypt(String encryptedText, SecretKey key) throws Exception {
+        byte[] decodedData = Base64.getDecoder().decode(encryptedText);
+        byte[] iv = new byte[12];
+        byte[] encryptedData = new byte[decodedData.length - 12];
 
-        byte[] iv = new byte[16];  // Zero IV (for simplicity)
-        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+        System.arraycopy(decodedData, 0, iv, 0, 12);
+        System.arraycopy(decodedData, 12, encryptedData, 0, encryptedData.length);
 
-        cipher.init(Cipher.ENCRYPT_MODE, aesKey, ivSpec);
-        byte[] encryptedBytes = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
 
-        return Base64.getEncoder().encodeToString(encryptedBytes);
+        byte[] decryptedData = cipher.doFinal(encryptedData);
+        return new String(decryptedData);
     }
 
-    public static String decryptAES(String encryptedText, SecretKey aesKey) throws Exception {
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-
-        byte[] iv = new byte[16];  // Zero IV (same as encryption)
-        IvParameterSpec ivSpec = new IvParameterSpec(iv);
-
-        cipher.init(Cipher.DECRYPT_MODE, aesKey, ivSpec);
-        byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
-
-        return new String(decryptedBytes, StandardCharsets.UTF_8);
-    }
 
 
     public static byte[] hexStringToByteArray(String data) {

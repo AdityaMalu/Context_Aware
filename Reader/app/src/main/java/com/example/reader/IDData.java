@@ -18,4 +18,21 @@ public class IDData {
         Gson gson = new Gson();
         return gson.toJson(this);
     }
+
+    public static IDData fromJson(String jsonString) {
+        Gson gson = new Gson();
+        return gson.fromJson(jsonString, IDData.class);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDob() {
+        return dob;
+    }
+
+    public String getIdNumber() {
+        return idNumber;
+    }
 }

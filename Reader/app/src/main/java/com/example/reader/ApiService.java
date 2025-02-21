@@ -1,5 +1,7 @@
 package com.example.reader;
 
+import org.bouncycastle.crypto.DSA;
+
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
@@ -14,4 +16,7 @@ public interface ApiService {
 
     @POST("/api/identity/create") // API endpoint
     Call<CreateResponse> createID(@Body CreateRequest request);
+
+    @POST("/api/identity/display")
+    Call<DisplayResponse> displayDetails(@Body DisplayRequest request);
 }
