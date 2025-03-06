@@ -22,6 +22,7 @@ import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -68,7 +69,11 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     ApiService apiService = RetrofitClient.getApiService();
 
-     // Map to store fragments and their names
+    IDFragment idFragment;
+    TicketFragment ticketFragment;
+    HealthCareFragment healthCareFragment;
+
+    // Map to store fragments and their names
 
 
     @Override
@@ -82,9 +87,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         Button btnTicket = findViewById(R.id.btn_ticket);
         Button btnHealthcare = findViewById(R.id.btn_healthcare);
 
-        IDFragment idFragment = new IDFragment(this::sendApduCommand);
-        TicketFragment ticketFragment = new TicketFragment();
-        HealthCareFragment healthCareFragment = new HealthCareFragment();
+        idFragment = new IDFragment(this::sendApduCommand);
+        ticketFragment = new TicketFragment(this::sendApduCommand);
+        healthCareFragment = new HealthCareFragment(this::sendApduCommand);
 
         Utils.put(idFragment, IDENTITY_APP_ID);
         Utils.put(ticketFragment, TICKETING_APP_ID);
@@ -194,6 +199,20 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
     private void sendIndextoServer(String decryptedIndex){
+        String fragmentValue = Utils.get(activeFragment);
+        String seed = fragmentValue + decryptedIndex;
+        Log.d("Seed", seed);
+        byte[] seedBytes = Utils.hexStringToByteArray(seed);
+
+        if (Objects.equals(fragmentValue, Utils.get(idFragment))) {
+            fetchIDData(decryptedIndex);
+        } else if (Objects.equals(fragmentValue, Utils.get(healthCareFragment))) {
+            fetchHealthData(decryptedIndex);
+        }
+
+    }
+
+    private void fetchIDData(String decryptedIndex){
         DisplayRequest request = new DisplayRequest(decryptedIndex,get(activeFragment));
         Call<DisplayResponse> call = apiService.displayDetails(request);
 
@@ -207,20 +226,64 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     String fragmentValue = Utils.get(MainActivity.activeFragment);
                     String seed = fragmentValue + decryptedIndex;
                     Log.d("Seed" , seed);
-                    byte[] seedBytes = Utils.hexStringToByteArray(seed);
                     try {
                         SecretKey key = generateKey(seed);
                         String decryptedJSON = decrypt(encryptedData,key);
                         IDData idData = IDData.fromJson(decryptedJSON);
-                        Log.d("Name : " , idData.getName());
-                        Log.d("DOB : " , idData.getDob());
-                        Log.d("ID : " , idData.getIdNumber());
+                        Utils.idCard.setVisibility(View.VISIBLE);
+                        Utils.nameId.setText("Name : " + idData.getName());
+                        Utils.dob.setText("DOB : " + idData.getDob());
+                        Utils.idNumber.setText("ID : " + idData.getIdNumber());
 
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
+                }
+                else{
+                    Log.e("Request failed", "Response code: " + response.code());
+                }
+            }
 
+            @Override
+            public void onFailure(Call<DisplayResponse> call, Throwable t) {
+                Log.e("Request failed", "Response code: " + t);
+            }
+        });
+    }
 
+    void fetchHealthData(String decryptedIndex){
+        DisplayRequest request = new DisplayRequest(decryptedIndex,get(activeFragment));
+        Call<DisplayResponse> call = apiService.displayHealthDetails(request);
+
+        call.enqueue(new Callback<DisplayResponse>() {
+            @Override
+            public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
+                if(response.isSuccessful()){
+                    DisplayResponse body = response.body();
+                    String encryptedData = body.getMessage();
+                    Log.d("server response" , encryptedData);
+                    String fragmentValue = Utils.get(MainActivity.activeFragment);
+                    String seed = fragmentValue + decryptedIndex;
+                    Log.d("Seed" , seed);
+                    try {
+                        SecretKey key = generateKey(seed);
+                        String decryptedJSON = decrypt(body.getMessage(), key);
+                        HealthCareData healthData = HealthCareData.fromJson(decryptedJSON);
+
+                        Log.d("HealthData", "Blood Type: " + healthData.getBloodType());
+                        Log.d("HealthData", "Allergy: " + healthData.getAllergy());
+                        Log.d("HealthData", "Vaccination: " + healthData.getVaccination());
+                        Log.d("HealthData", "Medical History: " + healthData.getMedicalHistory());
+
+                        Utils.healthCard.setVisibility(View.VISIBLE);
+                        Utils.bloodType.setText("Blood Type: " + healthData.getBloodType());
+                        Utils.allergy.setText("Allergy: " + healthData.getAllergy());
+                        Utils.vaccination.setText("Vaccination: " + healthData.getVaccination());
+                        Utils.medicalHistory.setText("History: " + healthData.getMedicalHistory());
+
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
                 }
                 else{
                     Log.e("Request failed", "Response code: " + response.code());

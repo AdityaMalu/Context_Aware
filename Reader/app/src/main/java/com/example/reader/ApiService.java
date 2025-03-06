@@ -17,6 +17,15 @@ public interface ApiService {
     @POST("/api/identity/create") // API endpoint
     Call<CreateResponse> createID(@Body CreateRequest request);
 
+    @POST("/api/healthcare/create")
+    Call<CreateResponse> createHealthCareID(@Body CreateRequest request);
+
+    @POST("/api/ticketing/create")
+    Call<CreateResponse> createTicket(@Body CreateRequest request);
+
     @POST("/api/identity/display")
     Call<DisplayResponse> displayDetails(@Body DisplayRequest request);
+
+    @POST("/api/healthcare/display")
+    Call<DisplayResponse> displayHealthDetails(@Body DisplayRequest request);
 }

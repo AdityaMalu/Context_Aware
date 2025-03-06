@@ -1,3 +1,64 @@
 <resources>
     <string name="app_name">ExReader</string>
+
+    <string-array name="hospital_request_types">
+            <item>Emergency</item>
+            <item>Checkup</item>
+            <item>Insurance Verification</item>
+    </string-array>
+
+    <string-array name="hospital_authentication">
+            <item>Verified Hospital</item>
+            <item>Unverified Hospital</item>
+    </string-array>
+
+    <string-array name="event_types">
+        <item>Concert</item>
+        <item>Conference</item>
+        <item>Sports Match</item>
+        <item>Private Event</item>
+    </string-array>
+
+    <string-array name="security_levels">
+        <item>High</item>
+        <item>Medium</item>
+        <item>Low</item>
+    </string-array>
+
+    <string-array name="ticket_statuses">
+        <item>Valid</item>
+        <item>Expired</item>
+        <item>Fraudulent</item>
+    </string-array>
+
+    <string-array name="crowd_densities">
+        <item>Low</item>
+        <item>Medium</item>
+        <item>High</item>
+    </string-array>
+
+    <string-array name="health_risk_levels">
+        <item>Low</item>
+        <item>Medium</item>
+        <item>High</item>
+    </string-array>
+
+    <string-array name="event_policies">
+        <item>Strict Check</item>
+        <item>Random Check</item>
+        <item>No Check</item>
+    </string-array>
+
+    <string-array name="government_health_alerts">
+        <item>Active Alert</item>
+        <item>No Alert</item>
+    </string-array>
+
+    <string-array name="time_since_event">
+        <item>Recent (0–7 days)</item>
+        <item>Medium (8–30 days)</item>
+        <item>Old(30-days)</item>
+    </string-array>
+
+
 </resources>
