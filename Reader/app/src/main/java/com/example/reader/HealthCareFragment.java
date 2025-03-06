@@ -1,5 +1,7 @@
 package com.example.reader;
 
+import static com.example.reader.Utils.HEALTHCARE_APP_ID;
+import static com.example.reader.Utils.IDENTITY_APP_ID;
 import static com.example.reader.Utils.concatenateArrays;
 import static com.example.reader.Utils.encrypt;
 import static com.example.reader.Utils.generateKey;
@@ -7,6 +9,7 @@ import static com.example.reader.Utils.generateKey;
 import android.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
+import android.telephony.CellSignalStrengthGsm;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,6 +29,9 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 
 import javax.crypto.SecretKey;
 
@@ -105,14 +111,24 @@ public class HealthCareFragment extends Fragment {
             createIdButton.setVisibility(View.VISIBLE);
             getIdButton.setVisibility(View.VISIBLE);
             contactTracingButton.setVisibility(View.VISIBLE);
+
 //            Log.d("IDFragment", "Card is connected. Enabling Create ID button.");
-        }if(!bloodType.isEmpty()) {
+        }
+        else{
             createIdButton.setEnabled(false);
             getIdButton.setEnabled(false);
             contactTracingButton.setEnabled(false);
             createIdButton.setVisibility(View.INVISIBLE);
             getIdButton.setVisibility(View.INVISIBLE);
             contactTracingButton.setVisibility(View.INVISIBLE);
+        }
+        if(!bloodType.isEmpty()) {
+            createIdButton.setEnabled(true);
+            getIdButton.setEnabled(true);
+            contactTracingButton.setEnabled(true);
+            createIdButton.setVisibility(View.VISIBLE);
+            getIdButton.setVisibility(View.VISIBLE);
+            contactTracingButton.setVisibility(View.VISIBLE);
 //            Log.d("IDFragment", "Card is disconnected. Disabling Create ID button.");
         }
     }
@@ -211,17 +227,48 @@ public class HealthCareFragment extends Fragment {
             }
 
             String hospitalRequestType = spinnerHospitalRequestType.getSelectedItem().toString();
+            String[] hospitalRequestTypes = getResources().getStringArray(R.array.hospital_request_types);
+            int hospitalRequestIndex = Arrays.asList(hospitalRequestTypes).indexOf(hospitalRequestType);
+
             boolean userConsent = switchUserConsent.isChecked();
-            String emergencyLevel = spinnerEmergencyLevel.getSelectedItem().toString();
-            String hospitalAuthentication = spinnerHospitalAuthentication.getSelectedItem().toString();
+            int userConsentIndex = 0;
+            if(userConsent){
+                userConsentIndex = 1;
+            }
+
+            String emergencyLevelType = spinnerEmergencyLevel.getSelectedItem().toString();
+            String[] emergencyLevelTypes = getResources().getStringArray(R.array.health_risk_levels);
+            int emergencyLevelIndex = Arrays.asList(emergencyLevelTypes).indexOf(emergencyLevelType);
+
+            String hospitalAuthenticationType = spinnerHospitalAuthentication.getSelectedItem().toString();
+            String[] hospitalAuthenticationTypes = getResources().getStringArray(R.array.hospital_authentication);
+            int hospitalAuthenticationIndex = Arrays.asList(hospitalAuthenticationTypes).indexOf(hospitalAuthenticationType);
+
             boolean timeOfRequest = switchTimeOfRequest.isChecked();
+            int timeOfRequestIndex= 0;
+            if(timeOfRequest){
+                timeOfRequestIndex = 1;
+            }
+
             boolean patientStatus = switchPatientStatus.isChecked();
+            int patientStatusIndex = 0;
+            if(patientStatus){
+                patientStatusIndex = 1;
+            }
+            byte[] appID = Utils.concatenateArrays(Utils.hexStringToByteArray(HEALTHCARE_APP_ID) , Utils.hexStringToByteArray(IDENTITY_APP_ID));
+            byte[] getIDData = new byte[]{(byte) hospitalAuthenticationIndex , (byte) emergencyLevelIndex , (byte) hospitalAuthenticationIndex , (byte) timeOfRequestIndex , (byte) patientStatusIndex , (byte) userConsentIndex};
+            byte[] command = new byte[]{ (byte) 0x80 , (byte) 0x40 , (byte) 0x00 , (byte) 0x00 , (byte) 0x08};
+
+            command = Utils.concatenateArrays(command,appID);
+            command = Utils.concatenateArrays(command,getIDData);
+
+            apduCommandListner.sendApduCommand(command);
 
             // Log the details
             Log.d("HospitalRequest", "Hospital Request Type: " + hospitalRequestType);
             Log.d("HospitalRequest", "User Consent: " + userConsent);
-            Log.d("HospitalRequest", "Emergency Level: " + emergencyLevel);
-            Log.d("HospitalRequest", "Hospital Authentication: " + hospitalAuthentication);
+            Log.d("HospitalRequest", "Emergency Level: " + emergencyLevelType);
+            Log.d("HospitalRequest", "Hospital Authentication: " + hospitalAuthenticationType);
             Log.d("HospitalRequest", "Time of Request (Day=true/Night=false): " + timeOfRequest);
             Log.d("HospitalRequest", "Patient Status (Conscious=true/Unconscious=false): " + patientStatus);
         });

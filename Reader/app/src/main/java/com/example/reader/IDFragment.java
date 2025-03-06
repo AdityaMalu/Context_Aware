@@ -98,7 +98,7 @@ public class IDFragment extends Fragment{
             createIdButton.setVisibility(View.VISIBLE);
 //            Log.d("IDFragment", "Card is connected. Enabling Create ID button.");
         }
-        if (!idNumber.isEmpty()){
+        else{
             createIdButton.setEnabled(false);
             createIdButton.setVisibility(View.INVISIBLE);
 //            Log.d("IDFragment", "Card is disconnected. Disabling Create ID button.");

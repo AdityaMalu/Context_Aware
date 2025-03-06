@@ -14,6 +14,7 @@ import static com.example.reader.Utils.hexStringToByteArray;
 
 import static com.example.reader.Utils.toHex;
 
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -212,6 +213,60 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     }
 
+    private void popUpIDData(IDData idData){
+        if (idData == null) {
+            Log.e("popUpIDData", "IDData is null");
+            return;
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("ID Details");
+
+        // Creating a message with IDData details
+        String message = "Name: " + idData.getName() + "\n" +
+                "DOB: " + idData.getDob() + "\n" +
+                "ID Number: " + idData.getIdNumber();
+
+        builder.setMessage(message);
+
+        builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void sendCrossIndextoServer(String decryptedIndex){
+        DisplayRequest request = new DisplayRequest(decryptedIndex,get(idFragment));
+        Call<DisplayResponse> call = apiService.displayDetails(request);
+
+        call.enqueue(new Callback<DisplayResponse>() {
+            @Override
+            public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
+                DisplayResponse body = response.body();
+                String encryptedData = body.getMessage();
+                Log.d("server response" , encryptedData);
+                String fragmentValue = Utils.get(idFragment);
+                String seed = fragmentValue + decryptedIndex;
+                Log.d("Seed" , seed);
+                try {
+                    SecretKey key = generateKey(seed);
+                    String decryptedJSON = decrypt(encryptedData,key);
+                    IDData idData = IDData.fromJson(decryptedJSON);
+                    popUpIDData(idData);
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call<DisplayResponse> call, Throwable t) {
+
+            }
+        });
+    }
+
     private void fetchIDData(String decryptedIndex){
         DisplayRequest request = new DisplayRequest(decryptedIndex,get(activeFragment));
         Call<DisplayResponse> call = apiService.displayDetails(request);
@@ -297,6 +352,8 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         });
     }
 
+
+
     private void handleResponse(byte[] response) throws Exception {
         if (response.length < 2) {
             statusTextView.setText("Invalid response");
@@ -329,10 +386,15 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     Log.d("Decrtypted Index" , decryptedIndex);
                     sendIndextoServer(decryptedIndex);
                 }
-
+            }
+            else if(response[1] == (byte) 0x40){
+                byte[] encryptedIDIndex = new byte[response.length - 7];
+                System.arraycopy(response, 5, encryptedIDIndex , 0 , response.length-7);
+                String decryptedIndex = decrpytIndex(encryptedIDIndex);
+                sendCrossIndextoServer(decryptedIndex);
             }
             else {
-                statusTextView.setText("Command executed successfully");
+                Log.d("Unknown Ins bytes", "Command executed successfully");
             }
         } else {
             statusTextView.setText("Error: SW=" + String.format("%02X%02X", sw1, sw2));
