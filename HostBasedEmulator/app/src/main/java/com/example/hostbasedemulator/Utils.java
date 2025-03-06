@@ -3,8 +3,13 @@ package com.example.hostbasedemulator;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Utils {
     private static final String HEX_CHARS = "0123456789ABCDEF";
@@ -22,6 +27,16 @@ public class Utils {
     public static final String PREF_NAME = "MyAppPrefs";
     public static String ISSUER_PUBLIC_KEY =  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl3ZZVLaR2VktMe+CjFyV6Bdm2RmBXWIgZa89cGYUUD18mHGxQnpCbHd5DumpAwDrSXSpsRvapMtTbgwg1pzmKHZaEqAzvnHD33Gk7zJViA31bcgJcbbEgQ+xIji8HCieqCnXg3ldI6Oq/3KVYFWZcfr/4eUANlRWvcldvIiMC2buRkb6gdiui+GMsTzq42rf+yhNhIdMGFIr7+0E79i5c8X0eF2wn4zsKFnWyUiUyyHwyYaT0U9Nl8MfBcRHTCavYqdLjYzgvO2roVlQR9iI0wXiPxFeRQqUUjW4HclzpzjLHnbesT70eBQwvpI779uHZlLn5XHRCy+GLCcPO01IqwIDAQAB";
 
+    public static final Map<String, List<String>> healthcare_identity = new LinkedHashMap<>();
+    static {
+        healthcare_identity.put("request_type", new ArrayList<>(Arrays.asList("emergency", "checkup", "insurance_verification")));
+        healthcare_identity.put("emergency_level", new ArrayList<>(Arrays.asList("critical", "moderate", "non_urgent")));
+        healthcare_identity.put("hospital_authentication", new ArrayList<>(Arrays.asList("verified_hospital", "unverified_hospital"
+        )));
+        healthcare_identity.put("time_of_request", new ArrayList<>(Arrays.asList("day", "night")));
+        healthcare_identity.put("patient_status", new ArrayList<>(Arrays.asList("conscious", "unconscious")));
+        healthcare_identity.put("user_consent", new ArrayList<>(Arrays.asList("false", "true")));
+    }
     public static byte[] hexStringToByteArray(String data) {
         byte[] result = new byte[data.length() / 2];
 
@@ -57,4 +72,5 @@ public class Utils {
 
         return result.toString();
     }
+
 }

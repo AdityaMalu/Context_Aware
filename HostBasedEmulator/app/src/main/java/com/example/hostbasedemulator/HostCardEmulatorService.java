@@ -1,9 +1,7 @@
 package com.example.hostbasedemulator;
 
-import static com.example.hostbasedemulator.Utils.PREF_NAME;
-import static com.example.hostbasedemulator.Utils.aesKeys;
-import static com.example.hostbasedemulator.Utils.getIssuerPublicKey;
-import static com.example.hostbasedemulator.Utils.toHex;
+import static com.example.hostbasedemulator.Utils.*;
+import static com.example.hostbasedemulator.ContextManager.*;
 
 import android.content.SharedPreferences;
 import android.nfc.cardemulation.HostApduService;
@@ -67,6 +65,8 @@ public class HostCardEmulatorService extends HostApduService {
                         return checkSignature(apdu);
                     case (byte) 0x30: // CREDIT
                         return createRecord(apdu);
+                    case (byte) 0x40:
+                        return crossResourceRequest(apdu);
                     default:
                         return UNKNOWN_COMMAND_RESPONSE;
                 }
@@ -218,6 +218,59 @@ public class HostCardEmulatorService extends HostApduService {
         return byteBuffer.array();
     }
 
+    private byte[] crossResourceRequest(byte[] apdu) throws Exception {
+        byte[] response = new byte[0];
+        SharedPreferences sharedPreferences = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+
+        byte[] requestingBytes = new byte[3];
+        byte[] requestedBytes = new byte[3];
+        byte[] contextVariables = new byte[apdu.length - 11];
+
+        System.arraycopy(apdu, 5, requestingBytes, 0, 3);
+        System.arraycopy(apdu, 8, requestedBytes, 0,3);
+        System.arraycopy(apdu, 11, contextVariables, 0, apdu.length - 11);
+
+        String requesting = toHex(requestingBytes);
+        Log.d("REQUESTING", String.valueOf(requesting.equals(HEALTHCARE_APP_ID)));
+        String requested = toHex(requestedBytes);
+        Log.d("REQUESTED", String.valueOf(requested.equals(IDENTITY_APP_ID)));
+
+        if (requesting.equals(HEALTHCARE_APP_ID) && requested.equals(IDENTITY_APP_ID)) {
+            Log.d("PREF", String.valueOf(sharedPreferences.contains(requested)));
+            if (sharedPreferences.contains(requested) && healthcareIdentity(contextVariables)) {
+                String index = sharedPreferences.getString(requested, "");
+                byte[] encryptedIndex = encryptionAES(Base64.getDecoder().decode(aesKeys.get(requesting)), index);
+                response = createResponse(encryptedIndex);
+            }
+        } else if (requesting.equals(TICKETING_APP_ID) && requested.equals(IDENTITY_APP_ID)) {
+
+        } else if (requesting.equals(HEALTHCARE_APP_ID) && requested.equals(TICKETING_APP_ID)) {
+
+        } else if (requesting.equals(TICKETING_APP_ID) && requested.equals(HEALTHCARE_APP_ID)) {
+
+        } else {
+            System.out.println("Invalid request");
+        }
+        Log.d("RESPONSE", Arrays.toString(response));
+        return response;
+    }
+
+    private byte[] createResponse(byte[] data) {
+        byte[] response = new byte[data.length + 7];
+        response[0] = (byte) 0x80;
+        response[1] = (byte) 0x40;
+        response[2] = (byte) 0x00;
+        response[3] = (byte) 0x00;
+        response[4] = (byte) (data.length + 2);
+
+        System.arraycopy(data, 0, response, 5, data.length);
+
+        response[response.length - 2] = (byte) 0x90;
+        response[response.length - 1] = (byte) 0x00;
+
+        return response;
+    }
+
     private String decryptionAES(byte[] decodedKey, String encryptedText)throws Exception {
         byte[] decodedData = Base64.getDecoder().decode(encryptedText);
         System.out.println("Decoded data " + Arrays.toString(decodedData));
@@ -236,12 +289,5 @@ public class HostCardEmulatorService extends HostApduService {
         byte[] decryptedData = cipher.doFinal(encryptedData);
         System.out.println("Dec data " + Arrays.toString(decryptedData));
         return new String(decryptedData, StandardCharsets.UTF_8);
-    }
-    // Helper method to handle extended length APDUs
-    private int getExtendedLength(byte[] apdu, int offset) {
-        if (apdu.length < offset + 2) {
-            return -1; // Invalid length
-        }
-        return ((apdu[offset] & 0xFF) << 8) | (apdu[offset + 1] & 0xFF);
     }
 }
