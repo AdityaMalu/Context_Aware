@@ -37,6 +37,35 @@ public class Utils {
         healthcare_identity.put("patient_status", new ArrayList<>(Arrays.asList("conscious", "unconscious")));
         healthcare_identity.put("user_consent", new ArrayList<>(Arrays.asList("false", "true")));
     }
+
+    public static final Map<String, List<String>> ticket_identity = new LinkedHashMap<>();
+    static {
+        ticket_identity.put("ticket_policy", new ArrayList<>(Arrays.asList("strict_id_verification", "standard_verification")));
+        ticket_identity.put("event_type", new ArrayList<>(Arrays.asList("concert", "conference", "sports_match", "private_event")));
+        ticket_identity.put("security_level", new ArrayList<>(Arrays.asList("high", "medium", "low")));
+        ticket_identity.put("ticket_status", new ArrayList<>(Arrays.asList("valid", "expired", "fraudulent")));
+        ticket_identity.put("crowd_density", new ArrayList<>(Arrays.asList("low", "medium", "high")));
+        ticket_identity.put("user_consent", new ArrayList<>(Arrays.asList("false", "true")));
+    }
+
+    public static final Map<String, List<String>> ticket_healthcare = new LinkedHashMap<>();
+    static {
+        ticket_healthcare.put("event_type", new ArrayList<>(Arrays.asList("concert", "conference", "sports_match")));
+        ticket_healthcare.put("health_risk_level", new ArrayList<>(Arrays.asList("low", "medium", "high")));
+        ticket_healthcare.put("event_policy", new ArrayList<>(Arrays.asList("strict_check", "random_check", "no_check")));
+        ticket_healthcare.put("government_health_alert", new ArrayList<>(Arrays.asList("active_alert", "no_alert")));
+        ticket_healthcare.put("ticket_status", new ArrayList<>(Arrays.asList("valid", "expired")));
+        ticket_healthcare.put("user_consent", new ArrayList<>(Arrays.asList("false", "true")));
+    }
+
+    public static final Map<String, List<String>> healthcare_ticket = new LinkedHashMap<>();
+    static {
+        healthcare_ticket.put("contact_tracing_level", new ArrayList<>(Arrays.asList("high_risk", "moderate_risk", "low_risk")));
+        healthcare_ticket.put("government_health_alert", new ArrayList<>(Arrays.asList("active_alert", "no_alert")));
+        healthcare_ticket.put("hospital_authentication", new ArrayList<>(Arrays.asList("verified_hospital", "unverified_hospital")));
+        healthcare_ticket.put("time_since_event", new ArrayList<>(Arrays.asList("recent (0-7 days)", "medium (8-30 days)", "old (30+ days)")));
+        healthcare_ticket.put("user_consent", new ArrayList<>(Arrays.asList("false", "true")));
+    }
     public static byte[] hexStringToByteArray(String data) {
         byte[] result = new byte[data.length() / 2];
 

@@ -231,39 +231,69 @@ public class HostCardEmulatorService extends HostApduService {
         System.arraycopy(apdu, 11, contextVariables, 0, apdu.length - 11);
 
         String requesting = toHex(requestingBytes);
-        Log.d("REQUESTING", String.valueOf(requesting.equals(HEALTHCARE_APP_ID)));
         String requested = toHex(requestedBytes);
-        Log.d("REQUESTED", String.valueOf(requested.equals(IDENTITY_APP_ID)));
 
         if (requesting.equals(HEALTHCARE_APP_ID) && requested.equals(IDENTITY_APP_ID)) {
+            Log.d("REQUESTING", "HEALTHCARE_APP_ID");
+            Log.d("REQUESTED", "IDENTITY_APP_ID");
             Log.d("PREF", String.valueOf(sharedPreferences.contains(requested)));
             if (sharedPreferences.contains(requested) && healthcareIdentity(contextVariables)) {
                 String index = sharedPreferences.getString(requested, "");
                 byte[] encryptedIndex = encryptionAES(Base64.getDecoder().decode(aesKeys.get(requesting)), index);
-                response = createResponse(encryptedIndex);
+                response = createResponse(encryptedIndex, requestedBytes);
+            } else {
+                response = accessDeniedResponse();
             }
         } else if (requesting.equals(TICKETING_APP_ID) && requested.equals(IDENTITY_APP_ID)) {
-
+            Log.d("REQUESTING", "TICKETING_APP_ID");
+            Log.d("REQUESTED", "IDENTITY_APP_ID");
+            Log.d("PREF", String.valueOf(sharedPreferences.contains(requested)));
+            if (sharedPreferences.contains(requested) && ticketIdentity(contextVariables)) {
+                String index = sharedPreferences.getString(requested, "");
+                byte[] encryptedIndex = encryptionAES(Base64.getDecoder().decode(aesKeys.get(requesting)), index);
+                response = createResponse(encryptedIndex, requestedBytes);
+            } else {
+                response = accessDeniedResponse();
+            }
         } else if (requesting.equals(HEALTHCARE_APP_ID) && requested.equals(TICKETING_APP_ID)) {
-
+            Log.d("REQUESTING", "HEALTHCARE_APP_ID");
+            Log.d("REQUESTED", "TICKETING_APP_ID");
+            Log.d("PREF", String.valueOf(sharedPreferences.contains(requested)));
+            if (sharedPreferences.contains(requested) && healthcareTicket(contextVariables)) {
+                String index = sharedPreferences.getString(requested, "");
+                byte[] encryptedIndex = encryptionAES(Base64.getDecoder().decode(aesKeys.get(requesting)), index);
+                response = createResponse(encryptedIndex, requestedBytes);
+            } else {
+                response = accessDeniedResponse();
+            }
         } else if (requesting.equals(TICKETING_APP_ID) && requested.equals(HEALTHCARE_APP_ID)) {
-
+            Log.d("REQUESTING", "TICKETING_APP_ID");
+            Log.d("REQUESTED", "HEALTHCARE_APP_ID");
+            Log.d("PREF", String.valueOf(sharedPreferences.contains(requested)));
+            if (sharedPreferences.contains(requested) && ticketHealthcare(contextVariables)) {
+                String index = sharedPreferences.getString(requested, "");
+                byte[] encryptedIndex = encryptionAES(Base64.getDecoder().decode(aesKeys.get(requesting)), index);
+                response = createResponse(encryptedIndex, requestedBytes);
+            } else {
+                response = accessDeniedResponse();
+            }
         } else {
             System.out.println("Invalid request");
         }
-        Log.d("RESPONSE", Arrays.toString(response));
+        Log.d("RESPONSE", toHex(response));
         return response;
     }
 
-    private byte[] createResponse(byte[] data) {
-        byte[] response = new byte[data.length + 7];
+    private byte[] createResponse(byte[] data, byte[] requestedBytes) {
+        byte[] response = new byte[data.length + requestedBytes.length + 7];
         response[0] = (byte) 0x80;
         response[1] = (byte) 0x40;
         response[2] = (byte) 0x00;
         response[3] = (byte) 0x00;
-        response[4] = (byte) (data.length + 2);
+        response[4] = (byte) (data.length + requestedBytes.length + 2);
 
-        System.arraycopy(data, 0, response, 5, data.length);
+        System.arraycopy(requestedBytes, 0, response, 5, requestedBytes.length);
+        System.arraycopy(data, 0, response, requestedBytes.length + 5, data.length);
 
         response[response.length - 2] = (byte) 0x90;
         response[response.length - 1] = (byte) 0x00;
@@ -271,11 +301,25 @@ public class HostCardEmulatorService extends HostApduService {
         return response;
     }
 
-    private String decryptionAES(byte[] decodedKey, String encryptedText)throws Exception {
-        byte[] decodedData = Base64.getDecoder().decode(encryptedText);
-        System.out.println("Decoded data " + Arrays.toString(decodedData));
+    private byte[] accessDeniedResponse() {
+        byte[] response = new byte[9];
+        response[0] = (byte) 0x80;
+        response[1] = (byte) 0x40;
+        response[2] = (byte) 0x00;
+        response[3] = (byte) 0x00;
+        response[4] = (byte) 0x02;
+        response[5] = (byte) 0x40;
+        response[6] = (byte) 0x40;
+        response[7] = (byte) 0x90;
+        response[8] = (byte) 0x00;
+
+        return response;
+    }
+
+    private String decryptionAES(byte[] decodedKey, byte[] encryptedText)throws Exception {
+        System.out.println("Decoded data " + Arrays.toString(encryptedText));
         SecretKey secretKey = new SecretKeySpec(decodedKey, "AES");
-        ByteBuffer byteBuffer = ByteBuffer.wrap(decodedData);
+        ByteBuffer byteBuffer = ByteBuffer.wrap(encryptedText);
 
         byte[] iv = new byte[16];
         byteBuffer.get(iv);  // Extract IV
