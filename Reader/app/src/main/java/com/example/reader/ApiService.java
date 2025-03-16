@@ -28,4 +28,7 @@ public interface ApiService {
 
     @POST("/api/healthcare/display")
     Call<DisplayResponse> displayHealthDetails(@Body DisplayRequest request);
+
+    @POST("/api/ticketing/display")
+    Call<DisplayResponse> displayTicketDetails(@Body DisplayRequest request);
 }

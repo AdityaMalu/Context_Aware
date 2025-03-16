@@ -2,6 +2,7 @@ package com.example.reader;
 
 import static com.example.reader.Utils.HEALTHCARE_APP_ID;
 import static com.example.reader.Utils.IDENTITY_APP_ID;
+import static com.example.reader.Utils.TICKETING_APP_ID;
 import static com.example.reader.Utils.concatenateArrays;
 import static com.example.reader.Utils.encrypt;
 import static com.example.reader.Utils.generateKey;
@@ -299,11 +300,39 @@ public class HealthCareFragment extends Fragment {
                 return;
             }
 
+            // Get Contact Tracing Level index
             String contactTracingLevel = spinnerContactTracingLevel.getSelectedItem().toString();
+            String[] contactTracingLevels = getResources().getStringArray(R.array.health_risk_levels);
+            int contactTracingIndex = Arrays.asList(contactTracingLevels).indexOf(contactTracingLevel);
+
+            // Get Government Health Alert index
             String governmentHealthAlert = spinnerGovernmentHealthAlert.getSelectedItem().toString();
+            String[] governmentHealthAlerts = getResources().getStringArray(R.array.government_health_alerts);
+            int governmentHealthAlertIndex = Arrays.asList(governmentHealthAlerts).indexOf(governmentHealthAlert);
+
+            // Get Hospital Authentication index
             String hospitalAuthentication = spinnerHospitalAuthentication.getSelectedItem().toString();
+            String[] hospitalAuthenticationTypes = getResources().getStringArray(R.array.hospital_authentication);
+            int hospitalAuthenticationIndex = Arrays.asList(hospitalAuthenticationTypes).indexOf(hospitalAuthentication);
+
+            // Get User Consent as index (true = 1, false = 0)
             boolean userConsent = switchUserConsent.isChecked();
+            int userConsentIndex = userConsent ? 1 : 0;
+
+            // Get Time Since Event index
             String timeSinceEvent = spinnerTimeSinceEvent.getSelectedItem().toString();
+            String[] timeSinceEventOptions = getResources().getStringArray(R.array.time_since_event);
+            int timeSinceEventIndex = Arrays.asList(timeSinceEventOptions).indexOf(timeSinceEvent);
+
+            // Construct APDU command
+            byte[] appID = Utils.concatenateArrays(Utils.hexStringToByteArray(HEALTHCARE_APP_ID), Utils.hexStringToByteArray(TICKETING_APP_ID));
+            byte[] contactTracingData = new byte[]{(byte) contactTracingIndex, (byte) governmentHealthAlertIndex, (byte) hospitalAuthenticationIndex,(byte) timeSinceEventIndex,(byte) userConsentIndex };
+            byte[] command = new byte[]{(byte) 0x80, (byte) 0x40, (byte) 0x00, (byte) 0x00, (byte) 0x08};
+
+            command = Utils.concatenateArrays(command, appID);
+            command = Utils.concatenateArrays(command, contactTracingData);
+
+            apduCommandListner.sendApduCommand(command);
 
             // Log the details
             Log.d("ContactTracing", "Contact Tracing Level: " + contactTracingLevel);
@@ -317,6 +346,7 @@ public class HealthCareFragment extends Fragment {
 
         AlertDialog dialog = builder.create();
         dialog.show();
+
 
     }
 

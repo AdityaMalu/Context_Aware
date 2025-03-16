@@ -1,5 +1,8 @@
 package com.example.reader;
 
+import static com.example.reader.Utils.HEALTHCARE_APP_ID;
+import static com.example.reader.Utils.IDENTITY_APP_ID;
+import static com.example.reader.Utils.TICKETING_APP_ID;
 import static com.example.reader.Utils.concatenateArrays;
 import static com.example.reader.Utils.encrypt;
 import static com.example.reader.Utils.generateKey;
@@ -23,6 +26,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import java.util.Arrays;
 
 import javax.crypto.SecretKey;
 
@@ -50,6 +55,12 @@ public class TicketFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_ticket, container, false);
         TextView textView = view.findViewById(R.id.text_fragment);
         textView.setText("Ticket Fragment");
+
+        Utils.eventType = view.findViewById(R.id.text_event_type);
+        Utils.ticketID = view.findViewById(R.id.text_ticket_id);
+        Utils.seatNumber = view.findViewById(R.id.text_seat_number);
+        Utils.date = view.findViewById(R.id.text_date);
+        Utils.ticketCard = view.findViewById(R.id.card_ticket_info);
 
         createIdButton = view.findViewById(R.id.btn_create_id);
         createIdButton.setOnClickListener(v -> showCreateIdDialog());
@@ -111,7 +122,7 @@ public class TicketFragment extends Fragment {
         builder.setView(dialogView);
 
         EditText eventType = dialogView.findViewById(R.id.edit_event_type);
-        EditText ticketID = dialogView.findViewById(R.id.edit_event_type);
+        EditText ticketID = dialogView.findViewById(R.id.edit_ticket_id);
         EditText seatNo  = dialogView.findViewById(R.id.edit_seat_no);
         EditText date = dialogView.findViewById(R.id.edit_date_of_event);
 
@@ -199,12 +210,55 @@ public class TicketFragment extends Fragment {
                 return;
             }
 
+
+            // Get selected Ticket Policy from RadioGroup
             String ticketPolicy = ((RadioButton) popupView.findViewById(radioGroupTicketPolicy.getCheckedRadioButtonId())).getText().toString();
+            int ticketPolicyIndex = 0;
+            int selectedRadioId = radioGroupTicketPolicy.getCheckedRadioButtonId();
+            if (selectedRadioId != -1) { // Ensure a button is selected
+                RadioButton selectedRadioButton = popupView.findViewById(selectedRadioId);
+                String ticketPolicytext = selectedRadioButton.getText().toString();
+
+                // Set index based on policy selection
+                if ("Strict ID Verification".equalsIgnoreCase(ticketPolicytext)) {
+                    ticketPolicyIndex = 1; // Strict policy
+                }
+            }
+
+
+            // Get user consent switch state
             boolean userConsent = switchUserConsent.isChecked();
+            int userConsentIndex = userConsent ? 1 : 0;
+
+            // Get selected Event Type
             String eventType = spinnerEventType.getSelectedItem().toString();
+            String[] eventTypes = getResources().getStringArray(R.array.event_types);
+            int eventTypeIndex = Arrays.asList(eventTypes).indexOf(eventType);
+
+            // Get selected Security Level
             String securityLevel = spinnerSecurityLevel.getSelectedItem().toString();
+            String[] securityLevels = getResources().getStringArray(R.array.security_levels);
+            int securityLevelIndex = Arrays.asList(securityLevels).indexOf(securityLevel);
+
+            // Get selected Ticket Status
             String ticketStatus = spinnerTicketStatus.getSelectedItem().toString();
+            String[] ticketStatuses = getResources().getStringArray(R.array.ticket_statuses);
+            int ticketStatusIndex = Arrays.asList(ticketStatuses).indexOf(ticketStatus);
+
+            // Get selected Crowd Density
             String crowdDensity = spinnerCrowdDensity.getSelectedItem().toString();
+            String[] crowdDensities = getResources().getStringArray(R.array.crowd_densities);
+            int crowdDensityIndex = Arrays.asList(crowdDensities).indexOf(crowdDensity);
+
+            byte[] appID = Utils.concatenateArrays(Utils.hexStringToByteArray(TICKETING_APP_ID) , Utils.hexStringToByteArray(IDENTITY_APP_ID));
+            byte[] getIDData = new byte[]{(byte) ticketPolicyIndex,(byte) eventTypeIndex,(byte) securityLevelIndex, (byte) ticketStatusIndex , (byte) crowdDensityIndex,(byte) userConsentIndex};
+            byte[] command = new byte[]{ (byte) 0x80 , (byte) 0x40 , (byte) 0x00 , (byte) 0x00 , (byte) 0x08};
+
+            command = Utils.concatenateArrays(command,appID);
+            command = Utils.concatenateArrays(command,getIDData);
+
+            apduCommandListner.sendApduCommand(command);
+
 
             // Log the details
             Log.d("TicketInfo", "Ticket Policy: " + ticketPolicy);
@@ -224,18 +278,18 @@ public class TicketFragment extends Fragment {
     }
 
     private void showVaccinationDialog(){
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         LayoutInflater inflater = getLayoutInflater();
         View popupView = inflater.inflate(R.layout.vaccination_status, null);
         builder.setView(popupView);
 
+        // Initialize UI elements
         Spinner spinnerEvent = popupView.findViewById(R.id.spinner_event_type);
         Spinner spinnerHealthRiskLevel = popupView.findViewById(R.id.spinner_health_risk_level);
         Spinner spinnerEventPolicy = popupView.findViewById(R.id.spinner_event_policy);
+        Spinner spinnerGovernmentHealthAlert = popupView.findViewById(R.id.spinner_government_health_alert);
         Switch switchTicketStatus = popupView.findViewById(R.id.switch_ticket_status);
         Switch switchUserConsent = popupView.findViewById(R.id.switch_user_consent);
-
-        AlertDialog alertDialog = builder.create();
 
         builder.setPositiveButton("Get", (dialog, which) -> {
             if (!MainActivity.checkTag()) {
@@ -243,20 +297,54 @@ public class TicketFragment extends Fragment {
                 return;
             }
 
+            try {
+                // Retrieve values from UI elements
+                String eventType = getSelectedItem(spinnerEvent, R.array.event_types);
+                String healthRiskLevel = getSelectedItem(spinnerHealthRiskLevel, R.array.health_risk_levels);
+                String eventPolicy = getSelectedItem(spinnerEventPolicy, R.array.event_policies);
+                String governmentHealthAlert = getSelectedItem(spinnerGovernmentHealthAlert , R.array.government_health_alerts);
+                boolean userConsent = switchUserConsent.isChecked();
+                boolean vaccinationTicketStatus = switchTicketStatus.isChecked();
 
-            String eventType = spinnerEvent.getSelectedItem().toString();
-            String healthRiskLevel = spinnerHealthRiskLevel.getSelectedItem().toString();
-            String eventPolicy = spinnerEventPolicy.getSelectedItem().toString();
-            boolean userConsent = switchUserConsent.isChecked();
-            boolean vaccinationTicketStatus = switchTicketStatus.isChecked();
+                // Validate selection
+                if (eventType == null || healthRiskLevel == null || eventPolicy == null) {
+                    Toast.makeText(getActivity(), "Please select all options", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                // Prepare data for APDU Command (if required)
+                byte userConsentByte = (byte) (userConsent ? 1 : 0);
+                byte ticketStatusByte = (byte) (vaccinationTicketStatus ? 1 : 0);
 
-            // Log the details
-            Log.d("EventInfo", "Event Type: " + eventType);
-            Log.d("EventInfo", "Health Risk Level: " + healthRiskLevel);
-            Log.d("EventInfo", "Event Policy: " + eventPolicy);
-            Log.d("EventInfo", "User Consent: " + userConsent);
-            Log.d("EventInfo", "Vaccination Ticket Status: " + vaccinationTicketStatus);
+                byte[] vaccinationData = new byte[]{
+                        (byte) getIndex(eventType, R.array.event_types),
+                        (byte) getIndex(healthRiskLevel, R.array.health_risk_levels),
+                        (byte) getIndex(eventPolicy, R.array.event_policies),
+                        (byte) getIndex(governmentHealthAlert, R.array.government_health_alerts),
+                        ticketStatusByte,
+                        userConsentByte
+                };
 
+                // Example placeholder APDU command
+                byte[] appID = Utils.concatenateArrays(Utils.hexStringToByteArray(TICKETING_APP_ID) , Utils.hexStringToByteArray(HEALTHCARE_APP_ID));
+                byte[] command = new byte[]{(byte) 0x80, (byte) 0x40, (byte) 0x00, (byte) 0x00, (byte) 0x08};
+
+                command = concatenateArrays(command,appID);
+                command = Utils.concatenateArrays(command, vaccinationData);
+
+                // Send APDU Command (if applicable)
+                apduCommandListner.sendApduCommand(command);
+
+                // Log Selected Values
+                Log.d("VaccinationStatus", "Event Type: " + eventType);
+                Log.d("VaccinationStatus", "Health Risk Level: " + healthRiskLevel);
+                Log.d("VaccinationStatus", "Event Policy: " + eventPolicy);
+                Log.d("VaccinationStatus", "User Consent: " + userConsent);
+                Log.d("VaccinationStatus", "Vaccination Ticket Status: " + vaccinationTicketStatus);
+
+            } catch (Exception e) {
+                Log.e("VaccinationPopupError", "Error processing vaccination popup: " + e.getMessage());
+                Toast.makeText(getActivity(), "An error occurred", Toast.LENGTH_SHORT).show();
+            }
         });
 
         builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
@@ -264,7 +352,18 @@ public class TicketFragment extends Fragment {
         AlertDialog dialog = builder.create();
         dialog.show();
 
+    }
 
+    private String getSelectedItem(Spinner spinner, int arrayResId) {
+        String selectedItem = spinner.getSelectedItem().toString();
+        String[] itemsArray = getResources().getStringArray(arrayResId);
+        return Arrays.asList(itemsArray).contains(selectedItem) ? selectedItem : null;
+    }
+
+
+    private int getIndex(String selectedItem, int arrayResId) {
+        String[] itemsArray = getResources().getStringArray(arrayResId);
+        return Arrays.asList(itemsArray).indexOf(selectedItem);
     }
 
     private void sendIDtoServer(String index, String encryptedData, String appID){
