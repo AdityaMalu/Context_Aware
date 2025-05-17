@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="@color/background_color">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Hospital Request Type -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hospital Request Type"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/spinner_hospital_request_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/hospital_request_types"
+            android:padding="8dp"
+            android:background="@drawable/spinner_background"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- User Consent -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="User Consent"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switch_user_consent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="User Consent"
+            android:checked="false"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Emergency Level -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Emergency Level"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/spinner_emergency_level"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/health_risk_levels"
+            android:padding="8dp"
+            android:background="@drawable/spinner_background"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Hospital Authentication -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hospital Authentication"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/spinner_hospital_authentication"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/hospital_authentication"
+            android:padding="8dp"
+            android:background="@drawable/spinner_background"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Time of Request -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Time of Request"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switch_time_of_request"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Day/Night"
+            android:checked="false"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Patient Status -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Patient Status"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switch_patient_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Conscious/Unconscious"
+            android:checked="false"
+            android:layout_marginBottom="16dp"/>
+    </LinearLayout>
+</ScrollView>

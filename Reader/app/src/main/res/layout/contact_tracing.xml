@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_color">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Contact Tracing Level"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/spinner_contact_tracing_level"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/security_levels"
+            android:padding="8dp"
+            android:background="@drawable/spinner_background"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Government Health Alert"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/spinner_government_health_alert"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/government_health_alerts"
+            android:padding="8dp"
+            android:background="@drawable/spinner_background"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hospital Authentication"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/spinner_hospital_authentication"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/hospital_authentication"
+            android:padding="8dp"
+            android:background="@drawable/spinner_background"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="User Consent"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switch_user_consent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="User Consent"
+            android:checked="false"
+            android:padding="8dp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Time Since Event"
+            android:textSize="18sp"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="8dp"/>
+
+        <Spinner
+            android:id="@+id/spinner_time_since_event"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/time_since_event"
+            android:padding="8dp"
+            android:background="@drawable/spinner_background"
+            android:textColor="@color/primary_text"
+            android:layout_marginBottom="16dp"/>
+    </LinearLayout>
+</ScrollView>

@@ -2,6 +2,10 @@ package com.example.reader;
 
 
 
+import android.annotation.SuppressLint;
+import android.widget.TextView;
+
+import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 
 
@@ -34,7 +38,9 @@ public class Utils {
     private static final String HEX_CHARS = "0123456789ABCDEF";
     private static final char[] HEX_CHARS_ARRAY = "0123456789ABCDEF".toCharArray();
 
-
+    @SuppressLint("StaticFieldLeak")
+    public static TextView nameId,dob,idNumber,bloodType,allergy,vaccination,medicalHistory,eventType, ticketID, seatNumber, date;
+    public static CardView idCard, healthCard,ticketCard;
     static String IDENTITY_APP_ID = "482730";
     static String HEALTHCARE_APP_ID = "915460";
      static String  TICKETING_APP_ID = "307210";

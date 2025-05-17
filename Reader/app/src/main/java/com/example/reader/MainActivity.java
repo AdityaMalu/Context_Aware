@@ -1,5 +1,6 @@
 package com.example.reader;
 
+import static android.widget.Toast.LENGTH_SHORT;
 import static com.example.reader.Utils.HEALTHCARE_APP_ID;
 import static com.example.reader.Utils.IDENTITY_APP_ID;
 import static com.example.reader.Utils.TICKETING_APP_ID;
@@ -14,19 +15,16 @@ import static com.example.reader.Utils.hexStringToByteArray;
 
 import static com.example.reader.Utils.toHex;
 
-import android.app.PendingIntent;
-import android.content.Intent;
-import android.content.IntentFilter;
+import android.app.AlertDialog;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
+import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
@@ -35,20 +33,16 @@ import androidx.fragment.app.FragmentTransaction;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyPair;
-import java.security.NoSuchAlgorithmException;
+
 import java.security.PrivateKey;
-import java.security.PublicKey;
+
 import java.security.Signature;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.HashMap;
+
 import java.util.Objects;
-
-import com.example.reader.Utils;
-
 import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
+
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -59,17 +53,12 @@ import retrofit2.Response;
 
 public class MainActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback, APDUCommandListner{
     private NfcAdapter nfcAdapter;
-    private TextView statusTextView;
-    private EditText amountEditText;
     private static IsoDep isoDep;
     public static Fragment activeFragment;
-
-    private String decryptedIndex;
-
     ApiService apiService = RetrofitClient.getApiService();
-
-     // Map to store fragments and their names
-
+    IDFragment idFragment;
+    TicketFragment ticketFragment;
+    HealthCareFragment healthCareFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,9 +71,9 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         Button btnTicket = findViewById(R.id.btn_ticket);
         Button btnHealthcare = findViewById(R.id.btn_healthcare);
 
-        IDFragment idFragment = new IDFragment(this::sendApduCommand);
-        TicketFragment ticketFragment = new TicketFragment();
-        HealthCareFragment healthCareFragment = new HealthCareFragment();
+        idFragment = new IDFragment(this::sendApduCommand);
+        ticketFragment = new TicketFragment(this::sendApduCommand);
+        healthCareFragment = new HealthCareFragment(this::sendApduCommand);
 
         Utils.put(idFragment, IDENTITY_APP_ID);
         Utils.put(ticketFragment, TICKETING_APP_ID);
@@ -149,7 +138,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
 
     public void sendApduCommand(byte[] command) {
         if (isoDep == null || !isoDep.isConnected()) {
-            statusTextView.setText("No NFC Tag connected");
+            Toast.makeText(this,"No NFC Tag connected",LENGTH_SHORT).show();
             return;
         }
 
@@ -159,7 +148,7 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             Log.i("INFO", "Response received" + Arrays.toString(new String[]{toHex(response)}));
             handleResponse(response);
         } catch (IOException e) {
-            statusTextView.setText("APDU Command failed");
+            Toast.makeText(this,"APDU Command Failed",LENGTH_SHORT).show();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -194,6 +183,202 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
     }
 
     private void sendIndextoServer(String decryptedIndex){
+        String fragmentValue = Utils.get(activeFragment);
+        String seed = fragmentValue + decryptedIndex;
+        Log.d("Seed", seed);
+        byte[] seedBytes = Utils.hexStringToByteArray(seed);
+
+        if (Objects.equals(fragmentValue, Utils.get(idFragment))) {
+            fetchIDData(decryptedIndex);
+        } else if (Objects.equals(fragmentValue, Utils.get(healthCareFragment))) {
+            fetchHealthData(decryptedIndex);
+        } else if (Objects.equals(fragmentValue, Utils.get(ticketFragment))) {
+            fetchTicketData(decryptedIndex);
+        }
+
+    }
+
+    private void popUpIDData(IDData idData){
+        if (idData == null) {
+            Log.e("popUpIDData", "IDData is null");
+            return;
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("ID Details");
+
+        // Creating a message with IDData details
+        String message = "Name: " + idData.getName() + "\n" +
+                "DOB: " + idData.getDob() + "\n" +
+                "ID Number: " + idData.getIdNumber();
+
+        builder.setMessage(message);
+
+        builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void popUpHealthData(HealthCareData healthData) {
+        if (healthData == null) {
+            Log.e("popUpHealthData", "HealthData is null");
+            return;
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Health Details");
+
+        // Creating a message with HealthData details
+        String message = "Blood Type: " + healthData.getBloodType() + "\n" +
+                "Allergy: " + healthData.getAllergy() + "\n" +
+                "Vaccination: " + healthData.getVaccination() + "\n" +
+                "Medical History: " + healthData.getMedicalHistory();
+
+        builder.setMessage(message);
+        builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+
+    private void popUpAccessDenied() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Access Denied");
+
+        builder.setMessage("You do not have permission to access this feature.");
+
+        builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void popUpTicketData(TicketData ticketData) {
+        if (ticketData == null) {
+            Log.e("popUpTicketData", "TicketData is null");
+            return;
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Ticket Details");
+
+        // Creating a message with TicketData details
+        String message = "Event Type: " + ticketData.getEventType() + "\n" +
+                "TicketID: " + ticketData.getTicketId() + "\n" +
+                "Date of Event: " + ticketData.getDateOfEvent() + "\n" +
+                "Seat Number " + ticketData.getSeatNo();
+
+        builder.setMessage(message);
+        builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+
+    private void sendIDCrossIndextoServer(String decryptedIndex){
+        DisplayRequest request = new DisplayRequest(decryptedIndex,get(idFragment));
+        Call<DisplayResponse> call = apiService.displayDetails(request);
+
+        call.enqueue(new Callback<DisplayResponse>() {
+            @Override
+            public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
+                DisplayResponse body = response.body();
+                assert body != null;
+                String encryptedData = body.getMessage();
+                Log.d("server response" , encryptedData);
+                String fragmentValue = get(idFragment);
+                String seed = fragmentValue + decryptedIndex;
+                Log.d("Seed" , seed);
+                try {
+                    SecretKey key = generateKey(seed);
+                    String decryptedJSON = decrypt(encryptedData,key);
+                    IDData idData = IDData.fromJson(decryptedJSON);
+                    popUpIDData(idData);
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call<DisplayResponse> call, Throwable t) {
+
+            }
+        });
+    }
+
+    private void sendHealthDataCrossIndextoServer(String decryptedIndex){
+        DisplayRequest request = new DisplayRequest(decryptedIndex,get(healthCareFragment));
+        Call<DisplayResponse> call = apiService.displayHealthDetails(request);
+
+        call.enqueue(new Callback<DisplayResponse>() {
+            @Override
+            public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
+                DisplayResponse body = response.body();
+                assert body != null;
+                String encryptedData = body.getMessage();
+                Log.d("server response" , encryptedData);
+                String fragmentValue = get(healthCareFragment);
+                String seed = fragmentValue + decryptedIndex;
+                Log.d("Seed" , seed);
+                try {
+                    SecretKey key = generateKey(seed);
+                    String decryptedJSON = decrypt(encryptedData,key);
+                    HealthCareData healthCareData = HealthCareData.fromJson(decryptedJSON);
+                    popUpHealthData(healthCareData);
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call<DisplayResponse> call, Throwable t) {
+
+            }
+        });
+    }
+
+    private void sendTicketDataCrossIndextoServer(String decryptedIndex){
+        DisplayRequest request = new DisplayRequest(decryptedIndex,get(ticketFragment));
+        Call<DisplayResponse> call = apiService.displayTicketDetails(request);
+
+        call.enqueue(new Callback<DisplayResponse>() {
+            @Override
+            public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
+                DisplayResponse body = response.body();
+                assert body != null;
+                String encryptedData = body.getMessage();
+                Log.d("server response" , encryptedData);
+                String fragmentValue = get(ticketFragment);
+                String seed = fragmentValue + decryptedIndex;
+                Log.d("Seed" , seed);
+                try {
+                    SecretKey key = generateKey(seed);
+                    String decryptedJSON = decrypt(encryptedData,key);
+                    TicketData ticketData = TicketData.fromJson(decryptedJSON);
+                    popUpTicketData(ticketData);
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call<DisplayResponse> call, Throwable t) {
+
+            }
+        });
+    }
+
+
+    private void fetchIDData(String decryptedIndex){
         DisplayRequest request = new DisplayRequest(decryptedIndex,get(activeFragment));
         Call<DisplayResponse> call = apiService.displayDetails(request);
 
@@ -202,25 +387,24 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
             public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
                 if(response.isSuccessful()){
                     DisplayResponse body = response.body();
+                    assert body != null;
                     String encryptedData = body.getMessage();
                     Log.d("server response" , encryptedData);
                     String fragmentValue = Utils.get(MainActivity.activeFragment);
                     String seed = fragmentValue + decryptedIndex;
                     Log.d("Seed" , seed);
-                    byte[] seedBytes = Utils.hexStringToByteArray(seed);
                     try {
                         SecretKey key = generateKey(seed);
                         String decryptedJSON = decrypt(encryptedData,key);
                         IDData idData = IDData.fromJson(decryptedJSON);
-                        Log.d("Name : " , idData.getName());
-                        Log.d("DOB : " , idData.getDob());
-                        Log.d("ID : " , idData.getIdNumber());
+                        Utils.idCard.setVisibility(View.VISIBLE);
+                        Utils.nameId.setText("Name : " + idData.getName());
+                        Utils.dob.setText("DOB : " + idData.getDob());
+                        Utils.idNumber.setText("ID : " + idData.getIdNumber());
 
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
-
-
                 }
                 else{
                     Log.e("Request failed", "Response code: " + response.code());
@@ -234,9 +418,100 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
         });
     }
 
+    void fetchHealthData(String decryptedIndex){
+        DisplayRequest request = new DisplayRequest(decryptedIndex,get(activeFragment));
+        Call<DisplayResponse> call = apiService.displayHealthDetails(request);
+
+        call.enqueue(new Callback<DisplayResponse>() {
+            @Override
+            public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
+                if(response.isSuccessful()){
+                    DisplayResponse body = response.body();
+                    String encryptedData = body.getMessage();
+                    Log.d("server response" , encryptedData);
+                    String fragmentValue = Utils.get(MainActivity.activeFragment);
+                    String seed = fragmentValue + decryptedIndex;
+                    Log.d("Seed" , seed);
+                    try {
+                        SecretKey key = generateKey(seed);
+                        String decryptedJSON = decrypt(body.getMessage(), key);
+                        HealthCareData healthData = HealthCareData.fromJson(decryptedJSON);
+
+                        Log.d("HealthData", "Blood Type: " + healthData.getBloodType());
+                        Log.d("HealthData", "Allergy: " + healthData.getAllergy());
+                        Log.d("HealthData", "Vaccination: " + healthData.getVaccination());
+                        Log.d("HealthData", "Medical History: " + healthData.getMedicalHistory());
+
+                        Utils.healthCard.setVisibility(View.VISIBLE);
+                        Utils.bloodType.setText("Blood Type: " + healthData.getBloodType());
+                        Utils.allergy.setText("Allergy: " + healthData.getAllergy());
+                        Utils.vaccination.setText("Vaccination: " + healthData.getVaccination());
+                        Utils.medicalHistory.setText("History: " + healthData.getMedicalHistory());
+
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                else{
+                    Log.e("Request failed", "Response code: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<DisplayResponse> call, Throwable t) {
+                Log.e("Request failed", "Response code: " + t);
+            }
+        });
+    }
+
+    void fetchTicketData(String decryptedIndex){
+        DisplayRequest request = new DisplayRequest(decryptedIndex,get(activeFragment));
+        Call<DisplayResponse> call = apiService.displayTicketDetails(request);
+
+        call.enqueue(new Callback<DisplayResponse>() {
+            @Override
+            public void onResponse(Call<DisplayResponse> call, Response<DisplayResponse> response) {
+                if(response.isSuccessful()){
+                    DisplayResponse body = response.body();
+                    String encryptedData = body.getMessage();
+                    Log.d("server response" , encryptedData);
+                    String fragmentValue = Utils.get(MainActivity.activeFragment);
+                    String seed = fragmentValue + decryptedIndex;
+                    Log.d("Seed" , seed);
+                    try {
+                        SecretKey key = generateKey(seed);
+                        String decryptedJSON = decrypt(body.getMessage(), key);
+                        TicketData ticketData = TicketData.fromJson(decryptedJSON);
+
+
+
+                        Utils.ticketCard.setVisibility(View.VISIBLE);
+                        Utils.eventType.setText("Event Type: " + ticketData.getEventType());
+                        Utils.ticketID.setText("Ticket ID: " + ticketData.getTicketId());
+                        Utils.seatNumber.setText("Seat Number: " + ticketData.getSeatNo());
+                        Utils.date.setText("Date of Event: " + ticketData.getDateOfEvent());
+
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                else{
+                    Log.e("Request failed", "Response code: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<DisplayResponse> call, Throwable t) {
+                Log.e("Request failed", "Response code: " + t);
+            }
+        });
+    }
+
+
+
     private void handleResponse(byte[] response) throws Exception {
         if (response.length < 2) {
-            statusTextView.setText("Invalid response");
+            Toast.makeText(this,"Invalid Response",LENGTH_SHORT).show();
             return;
         }
         Log.i("INFO", "Response received" + Arrays.toString(new String[]{toHex(response)}));
@@ -262,17 +537,39 @@ public class MainActivity extends AppCompatActivity implements NfcAdapter.Reader
                     byte[] indexBytes = new byte[response.length - 7];
                     System.arraycopy(response,5,indexBytes,0, response.length-7);
                     Log.d("Index Bytes" , Arrays.toString(indexBytes));
-                    decryptedIndex = decrpytIndex(indexBytes);
+                    String decryptedIndex = decrpytIndex(indexBytes);
                     Log.d("Decrtypted Index" , decryptedIndex);
                     sendIndextoServer(decryptedIndex);
+                }
+            }
+            else if(response[1] == (byte) 0x40){
+                if(response[5] == (byte) 0x40 && response[6] == (byte) 0x40){
+                    popUpAccessDenied();
+                }
+                else{
+                    byte[] framgentRequested = new byte[3];
+                    System.arraycopy(response,5,framgentRequested,0,3);
+                    byte[] encryptedIDIndex = new byte[response.length - 10];
+                    System.arraycopy(response, 8, encryptedIDIndex , 0 , response.length-10);
+                    Log.d("FragmentRequested" , Utils.toHex(framgentRequested));
+                    Log.d("EncytpedRequest" , Arrays.toString(encryptedIDIndex));
+                    String decryptedIndex = decrpytIndex(encryptedIDIndex);
+                    if(toHex(framgentRequested).equals("482730")){
+                        sendIDCrossIndextoServer(decryptedIndex);
+                    } else if (toHex(framgentRequested).equals("915460")) {
+                        sendHealthDataCrossIndextoServer(decryptedIndex);
+                    } else if (toHex(framgentRequested).equals("307210")) {
+                        sendTicketDataCrossIndextoServer(decryptedIndex);
+                    }
+
                 }
 
             }
             else {
-                statusTextView.setText("Command executed successfully");
+                Log.d("Unknown Ins bytes", "Command executed successfully");
             }
         } else {
-            statusTextView.setText("Error: SW=" + String.format("%02X%02X", sw1, sw2));
+           Log.e("Error", "SW=" + String.format("%02X%02X", sw1, sw2));
         }
     }
 

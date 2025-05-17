@@ -21,6 +21,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 
 import java.net.HttpURLConnection;
@@ -57,6 +58,10 @@ public class IDFragment extends Fragment{
         TextView textView = view.findViewById(R.id.text_fragment);
         textView.setText("ID Fragment");
 
+        Utils.nameId = view.findViewById(R.id.text_name);
+        Utils.dob = view.findViewById(R.id.text_dob);
+        Utils.idNumber = view.findViewById(R.id.text_id_number);
+        Utils.idCard = view.findViewById(R.id.card_id_info);
         createIdButton = view.findViewById(R.id.btn_create_id);
         createIdButton.setOnClickListener(v -> showCreateIdDialog());
 
@@ -86,12 +91,16 @@ public class IDFragment extends Fragment{
     }
 
     private void checkCardStatus() {
+        String idNumber = Utils.idNumber.getText().toString().trim();
         // Check if the NFC card is connected using MainActivity's checkTag() method
         if (MainActivity.checkTag()) {
             createIdButton.setEnabled(true);
+            createIdButton.setVisibility(View.VISIBLE);
 //            Log.d("IDFragment", "Card is connected. Enabling Create ID button.");
-        } else {
+        }
+        else{
             createIdButton.setEnabled(false);
+            createIdButton.setVisibility(View.INVISIBLE);
 //            Log.d("IDFragment", "Card is disconnected. Disabling Create ID button.");
         }
     }
@@ -106,13 +115,6 @@ public class IDFragment extends Fragment{
         EditText editName = dialogView.findViewById(R.id.edit_name);
         EditText editDob = dialogView.findViewById(R.id.edit_dob);
         EditText editIdNumber = dialogView.findViewById(R.id.edit_id_number);
-
-
-
-
-        // Check Card button action
-
-
 
         builder.setPositiveButton("Create", (dialog, which) -> {
             if (!MainActivity.checkTag()) {

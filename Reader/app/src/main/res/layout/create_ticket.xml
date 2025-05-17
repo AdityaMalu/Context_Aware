@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/background_color">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Event Ticket Information"
+        android:textSize="24sp"
+        android:textColor="@color/primary_text"
+        android:gravity="center"
+        android:paddingBottom="16dp"/>
+
+    <EditText
+        android:id="@+id/edit_event_type"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter Event Type (Concert, Sports, etc.)"
+        android:padding="12dp"
+        android:textColor="@color/primary_text"/>
+
+    <EditText
+        android:id="@+id/edit_ticket_id"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter Ticket ID"
+        android:padding="12dp"
+        android:textColor="@color/primary_text" />
+
+    <EditText
+        android:id="@+id/edit_seat_no"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter Seat Number"
+        android:padding="12dp"
+        android:textColor="@color/primary_text" />
+
+    <EditText
+        android:id="@+id/edit_date_of_event"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter Date of Event"
+        android:padding="12dp"
+        android:textColor="@color/primary_text" />
+
+
+</LinearLayout>

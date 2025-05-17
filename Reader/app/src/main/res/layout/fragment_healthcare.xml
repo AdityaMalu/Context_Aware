@@ -1,13 +1,119 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="vertical">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:padding="24dp">
 
     <TextView
         android:id="@+id/text_fragment"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="20sp"/>
-</LinearLayout>
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/black"
+        android:layout_marginBottom="24dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Data Container (Initially Hidden) -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/card_health_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        app:layout_constraintTop_toBottomOf="@id/text_fragment"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/text_blood_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Blood Type: "
+            android:textSize="18sp"
+            android:textColor="@android:color/black"/>
+
+        <TextView
+            android:id="@+id/text_allergy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Allergy: "
+            android:textSize="18sp"
+            android:textColor="@android:color/black"/>
+
+        <TextView
+            android:id="@+id/text_vaccination"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Vaccination: "
+            android:textSize="18sp"
+            android:textColor="@android:color/black"/>
+
+        <TextView
+            android:id="@+id/text_medical_history"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Medical History: "
+            android:textSize="18sp"
+            android:textColor="@android:color/black"/>
+
+    </LinearLayout>
+
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- Buttons Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        app:layout_constraintTop_toBottomOf="@id/card_health_info"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btn_create_id"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Create ID"
+            android:enabled="false"
+            android:visibility="invisible"
+            android:backgroundTint="@color/purple_500"
+            android:textColor="@android:color/white"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btn_get_id"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Get ID"
+            android:enabled="false"
+            android:visibility="invisible"
+            android:backgroundTint="@color/teal_700"
+            android:textColor="@android:color/white"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btn_contact_tracing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Contact Tracing"
+            android:visibility="invisible"
+            android:enabled="false"
+            android:backgroundTint="@color/red_500"
+            android:textColor="@android:color/white"
+            android:layout_marginBottom="12dp"/>
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
